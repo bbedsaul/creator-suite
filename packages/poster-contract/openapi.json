@@ -1,0 +1,302 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Social Poster internal API",
+    "version": "1.2",
+    "description": "Cross-platform publishing API. Two auth modes share every /v1 route (D-023): app mode uses a client-credentials JWT, user mode uses the signed-in user’s Supabase session JWT and acts as the first-party poster-web app."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "The service root; deployments front this with TLS."
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "App mode: the token from POST /v1/oauth/token. User mode: a Supabase session JWT."
+      }
+    },
+    "schemas": {
+      "TokenRequest": {
+        "type": "object",
+        "properties": {
+          "grant_type": {
+            "type": "string",
+            "enum": ["client_credentials"]
+          },
+          "client_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "client_secret": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["grant_type", "client_id", "client_secret"],
+        "additionalProperties": false,
+        "description": "OAuth2 client-credentials request, form-encoded."
+      },
+      "TokenResponse": {
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "JWT whose sub is the app id."
+          },
+          "token_type": {
+            "type": "string",
+            "enum": ["Bearer"]
+          },
+          "expires_in": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991,
+            "description": "Seconds until the token expires."
+          }
+        },
+        "required": ["access_token", "token_type", "expires_in"],
+        "additionalProperties": false,
+        "description": "A short-lived app access token."
+      },
+      "AuthContext": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": ["app", "user"],
+            "description": "Which auth mode the caller used."
+          },
+          "app": {
+            "type": "object",
+            "properties": {
+              "client_id": {
+                "type": "string",
+                "description": "The app the request acts as."
+              },
+              "first_party": {
+                "type": "boolean"
+              }
+            },
+            "required": ["client_id", "first_party"],
+            "additionalProperties": false
+          },
+          "user_id": {
+            "nullable": true,
+            "description": "The user this request acts on behalf of, or null in app mode with no user.",
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": ["mode", "app", "user_id"],
+        "additionalProperties": false,
+        "description": "Who the API thinks you are. Identical shape in both auth modes."
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "invalid_request",
+                  "invalid_token",
+                  "forbidden_user",
+                  "grant_missing",
+                  "not_found",
+                  "idempotency_conflict",
+                  "too_late",
+                  "constraint_violation",
+                  "rate_limited",
+                  "internal_error"
+                ],
+                "description": "Machine-readable error code."
+              },
+              "message": {
+                "type": "string",
+                "description": "Human-readable summary. Never used for control flow."
+              },
+              "details": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "target_index": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "Index of the failing target in the submitted targets array."
+                    },
+                    "connection_id": {
+                      "description": "Public id of the target connection.",
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "Constraint code; see the contract §8 list."
+                    },
+                    "constraint": {
+                      "description": "The limit that was exceeded and the actual value, as data.",
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": ["target_index", "code"],
+                  "additionalProperties": false,
+                  "description": "One per failing target, so a client can fix exactly what broke."
+                }
+              },
+              "request_id": {
+                "type": "string",
+                "description": "Echoes the X-Request-Id response header. Quote it in support requests."
+              }
+            },
+            "required": ["code", "message", "request_id"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["error"],
+        "additionalProperties": false,
+        "description": "The single error envelope used by every non-2xx response."
+      }
+    }
+  },
+  "paths": {
+    "/v1/oauth/token": {
+      "post": {
+        "operationId": "createToken",
+        "summary": "Exchange client credentials for a short-lived app token",
+        "description": "Form-encoded, per OAuth2. The returned JWT is valid for 15 minutes and its sub claim identifies the app. App credentials alone never authorize publishing: acting for a user also requires that user’s grant.",
+        "tags": ["auth"],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A new access token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request or unsupported grant_type.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unknown client_id, wrong client_secret, or disabled app.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many token requests; honor Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/context": {
+      "get": {
+        "operationId": "getAuthContext",
+        "summary": "Report who the API thinks you are",
+        "description": "Returns the acting app and user for the presented token. The response shape is identical in both auth modes, which makes it the cheapest way for a client to confirm its credentials and the user it is acting for.",
+        "tags": ["auth"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "The user to act as. Required in app mode for user-scoped work; in user mode it must equal the token subject or the request is rejected with forbidden_user."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The resolved auth context.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthContext"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or expired token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "User-mode token does not match the requested user_id.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Per-app rate limit exceeded; honor Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

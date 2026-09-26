@@ -1,6 +1,11 @@
-# Social Poster — Internal API Contract (v1.1)
+# Social Poster — Internal API Contract (v1.2)
 
-*Creator Suite · v1.1 2026-09-26 (v1 2026-09-19). Repo copy; this file is now the source of truth for implementation. The machine-readable form lives in `packages/poster-contract` (zod → OpenAPI, DECISIONS D-026), and the two must agree.*
+*Creator Suite · v1.2 2026-09-26 (v1.1 2026-09-26, v1 2026-09-19). Repo copy; this file is now the source of truth for implementation. The machine-readable form lives in `packages/poster-contract` (zod → OpenAPI, DECISIONS D-026), and the two must agree.*
+
+**v1.2 changes, all additive and non-breaking under §10:**
+- §2: `expires_in` on the token response, and a new `GET /v1/auth/context` endpoint reporting the acting app and user (D-048).
+- §8: every error envelope now carries `request_id`, echoed in the `X-Request-Id` response header (D-044). Added codes `invalid_request` (400), `not_found` (404) and `internal_error` (500), which were already in use as HTTP statuses but unnamed.
+- §8: public IDs are Crockford base32 of the resource UUID, 26 characters after the prefix (D-043).
 
 **v1.1 changes, all additive and non-breaking under §10:**
 - §2: second auth mode (user mode) for browser clients (D-023).
@@ -31,13 +36,14 @@ The API has **two auth modes on the same `/v1` routes**. Handlers are shared, so
 Each client app receives a `client_id` and `client_secret` at registration (stored in the secrets manager, never in app databases). Requests authenticate with a short-lived bearer token from a client-credentials exchange:
 
 ```
-POST /v1/oauth/token
+POST /v1/oauth/token          (application/x-www-form-urlencoded)
   grant_type=client_credentials&client_id=...&client_secret=...
-→ { "access_token": "<jwt, 15 min>", "token_type": "Bearer" }
+→ { "access_token": "<jwt>", "token_type": "Bearer", "expires_in": 900 }
 ```
 
 - Tokens are scoped to the app; the JWT `sub` claim identifies the app on every request.
-- Per-app rate limits; 429 with `Retry-After` on breach.
+- Per-app rate limits; 429 with `Retry-After` on breach. The token endpoint has its own limit per `client_id` and client IP, because it is the only unauthenticated route.
+- An unknown `client_id`, a wrong `client_secret`, and a disabled app are all `401 invalid_token` with the same message: the endpoint is not an app-enumeration oracle.
 - All traffic over TLS. Acting on behalf of a user requires that user's grant (section 3) — app credentials alone never authorize publishing.
 
 ### 2.2 User mode (browsers)
@@ -51,7 +57,18 @@ Authorization: Bearer <supabase session jwt>
 - The request acts as the first-party app `poster-web`. `user_id` in paths and bodies must equal the token's `sub`; otherwise the result is `403 forbidden_user`.
 - The user implicitly holds full scopes on their own connections through `poster-web`, so no consent step is needed for your own composer.
 - Other suite UIs (clipper-web, trainer-web) do **not** use user mode against the Poster. They call their own backend, which calls the Poster in app mode.
-- CORS is allow-listed per origin.
+- CORS is allow-listed per origin. No wildcard: a user-mode request carries a real session token.
+
+### 2.3 Checking who you are *(v1.2)*
+
+```
+GET /v1/auth/context[?user_id=...]
+→ { "mode": "app" | "user",
+    "app": { "client_id": "trainer-dev", "first_party": false },
+    "user_id": "<uuid>" | null }
+```
+
+The response shape is identical in both modes, which makes this the cheapest way for a client to confirm its credentials and the user it is acting for without attempting real work. In user mode a supplied `user_id` must equal the token subject (`403 forbidden_user`); omit it and the subject is used.
 
 ## 3. Scope request & consent flow
 
@@ -182,25 +199,33 @@ Signatures use a per-app webhook secret; reject if the timestamp is older than 5
 
 One envelope everywhere; `details` is per-target so a client can fix exactly the failing platform (FR-06).
 
+Every envelope carries `request_id`, which is also returned in the `X-Request-Id` response header *(v1.2)*. If a client sends its own `X-Request-Id`, that value is used, so a caller's correlation id survives into our logs. Quote it when reporting a problem.
+
 ```
 422
 { "error": { "code": "constraint_violation",
     "message": "1 of 2 targets failed validation",
+    "request_id": "8f1c3d2e-4b5a-6c7d-8e9f-0a1b2c3d4e5f",
     "details": [
-      { "target_index": 0, "connection_id": "cn_789",
+      { "target_index": 0, "connection_id": "cn_0123456789ABCDEFGHJKMNPQRS",
         "code": "video_too_long",
         "constraint": { "max_duration_s": 600, "actual_s": 745 } } ] } }
 ```
 
+**Public IDs** *(v1.2)*: `<prefix>_<26 characters>`, where the body is Crockford base32 of the resource's UUID. Prefixes are `po_` post, `tg_` target, `cn_` connection, `md_` media, `ev_` event, `sr_` scope request. The alphabet excludes I, L, O and U and is case-insensitive on input, so an ID survives being read aloud or retyped. A malformed or unknown ID is always `404 not_found`, never a 500.
+
 | HTTP | Code | Meaning |
 | --- | --- | --- |
+| 400 | `invalid_request` *(v1.2)* | Malformed body, query, or unsupported `grant_type` |
 | 401 | `invalid_token` | App or user token expired or bad |
+| 404 | `not_found` *(v1.2)* | No such resource, or an ID that could not be one |
 | 403 | `forbidden_user` | User-mode token doesn't match the `user_id` in the request |
 | 403 | `grant_missing` | No user grant covering that connection/scope |
 | 409 | `idempotency_conflict` | Same key, different body |
 | 409 | `too_late` | Cancel/edit after dispatch began |
 | 422 | `constraint_violation` | Platform rules failed; see `details` |
 | 429 | `rate_limited` | Per-app limit; honor `Retry-After` |
+| 500 | `internal_error` *(v1.2)* | Unexpected failure; the message is deliberately generic |
 
 Constraint codes (extensible; clients ignore unknown ones): `text_too_long`, `video_too_long`, `media_unsupported_format`, `aspect_ratio_invalid`, `thread_not_supported`, `too_many_media`. Runtime failures use `reason_class` on `post.failed` (extensible; clients handle unknown values as generic failure):
 

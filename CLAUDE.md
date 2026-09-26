@@ -93,6 +93,7 @@ pnpm exec supabase test db                 # pgTAP
 pnpm -F @suite/poster-service test
 pnpm -F @suite/poster-service test:integration   # needs a running local stack (D-040)
 pnpm -F @suite/poster-service gen:types          # regenerate DB types after a migration
+pnpm -F @suite/poster-service seed               # register dev client apps -> .env.local (D-049)
 pnpm -F @suite/poster-service dev:api      # backend alone — no frontend needed
 pnpm -F @suite/poster-service dev:worker
 pnpm -F @suite/poster-contract gen         # regenerate OpenAPI spec + client

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Typed SDK generated from the Poster OpenAPI spec (D-026). Generated output - do not hand-edit.",
+  "description": "Typed SDK for the Poster API. schema.d.ts is generated from the OpenAPI spec (D-026).",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -26,5 +26,8 @@
     "@types/node": "^24.19.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.17.0"
   }
 }

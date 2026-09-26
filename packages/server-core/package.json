@@ -26,5 +26,9 @@
     "@types/node": "^24.19.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "@node-rs/argon2": "^2.2.1",
+    "jose": "^6.2.12"
   }
 }

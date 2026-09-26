@@ -1,13 +1,39 @@
 /**
  * @suite/poster-contract — the wire contract as code (D-026, CLAUDE.md rule 13).
  *
- * Every API change starts here: zod schemas in this package generate the
- * OpenAPI spec, which generates @suite/poster-client. The schemas themselves
- * (auth, errors, media, posts, constraints, webhooks) land in S03 and after;
- * S01 only establishes the package and its `gen` entrypoint.
- *
- * The version tracks docs/social-poster-internal-api-contract.md (D-027).
+ * Every API change starts here: the zod schemas below generate the OpenAPI spec,
+ * which generates @suite/poster-client. Handlers parse input with these schemas
+ * and return values that satisfy them; no service defines its own parallel types.
  */
-export const CONTRACT_VERSION = '1.1' as const;
+export { CONTRACT_VERSION, type ContractVersion } from './version.js';
 
-export type ContractVersion = typeof CONTRACT_VERSION;
+export {
+  ID_PREFIXES,
+  InvalidPublicIdError,
+  encodeId,
+  decodeId,
+  tryDecodeId,
+  publicId,
+  PostId,
+  TargetId,
+  ConnectionId,
+  MediaId,
+  EventId,
+  ScopeRequestId,
+  type ResourceKind,
+  type IdPrefix,
+} from './ids.js';
+
+export {
+  ERROR_CODES,
+  ERROR_STATUS,
+  CONSTRAINT_CODES,
+  ErrorCode,
+  ConstraintCode,
+  ErrorDetail,
+  ErrorEnvelope,
+} from './errors.js';
+
+export { AUTH_MODES, AuthMode, AuthContext, TokenRequest, TokenResponse } from './auth.js';
+
+export { buildOpenApiDocument } from './openapi.js';
