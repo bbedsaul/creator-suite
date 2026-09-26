@@ -15,8 +15,10 @@
     "lint": "eslint .",
     "lint:deps": "depcruise . --config .dependency-cruiser.cjs",
     "lint:deps:verify": "node scripts/verify-boundaries.mjs",
+    "gen:check": "node scripts/check-generated.mjs contract",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "gen:types:check": "node scripts/check-generated.mjs db-types"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

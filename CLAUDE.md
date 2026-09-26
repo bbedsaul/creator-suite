@@ -94,6 +94,9 @@ pnpm -F @suite/poster-service test
 pnpm -F @suite/poster-service test:integration   # needs a running local stack (D-040)
 pnpm -F @suite/poster-service gen:types          # regenerate DB types after a migration
 pnpm -F @suite/poster-service seed               # register dev client apps -> .env.local (D-049)
+pnpm -F @suite/poster-service seed -- --rotate   # issue new secrets (default preserves, D-051)
+pnpm gen:check                                   # committed spec + client match the schemas
+pnpm gen:types:check                             # committed DB types match the migrations
 pnpm -F @suite/poster-service dev:api      # backend alone — no frontend needed
 pnpm -F @suite/poster-service dev:worker
 pnpm -F @suite/poster-contract gen         # regenerate OpenAPI spec + client
@@ -102,6 +105,10 @@ pnpm lint:deps:verify                      # proves lint:deps rejects real viola
 pnpm -r build && pnpm -r test              # repo-wide gates
 pnpm lint && pnpm format:check             # eslint, prettier
 ```
+
+CI (`.github/workflows/ci.yml`, D-053) runs all of the above on every push to
+`main` and every pull request, in two jobs: `check` needs nothing running, and
+`database` starts Supabase with only db, auth and kong.
 
 Container images (one image, two entrypoints — D-034). Build context is the repo
 root, not the service directory:

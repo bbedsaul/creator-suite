@@ -179,15 +179,40 @@ describe('the seed script (D-049)', () => {
     }
   });
 
-  it('is safe to re-run, rotating rather than duplicating', async () => {
+  it('preserves an existing secret when re-run, so .env.local stays valid (D-051)', async () => {
     const before = await sql<{ client_secret_hash: string }[]>`
       select client_secret_hash from poster.client_apps where client_id = 'trainer-dev'`;
-    await seed(DATABASE_URL);
-    const after = await sql<{ client_secret_hash: string; count: string }[]>`
+    const entries = await seed(DATABASE_URL);
+    const after = await sql<{ client_secret_hash: string }[]>`
+      select client_secret_hash from poster.client_apps where client_id = 'trainer-dev'`;
+
+    expect(after).toHaveLength(1);
+    expect(after[0]?.client_secret_hash).toBe(before[0]?.client_secret_hash);
+    // And it says so, rather than pretending it issued something.
+    const trainer = entries.find((entry) => entry.clientId === 'trainer-dev');
+    expect(trainer?.status).toBe('preserved');
+    expect(trainer?.secret).toBeUndefined();
+  });
+
+  it('rotates on request, without duplicating the row', async () => {
+    const before = await sql<{ client_secret_hash: string }[]>`
+      select client_secret_hash from poster.client_apps where client_id = 'trainer-dev'`;
+    const entries = await seed(DATABASE_URL, { rotate: true });
+    const after = await sql<{ client_secret_hash: string }[]>`
       select client_secret_hash from poster.client_apps where client_id = 'trainer-dev'`;
 
     expect(after).toHaveLength(1);
     expect(after[0]?.client_secret_hash).not.toBe(before[0]?.client_secret_hash);
+
+    const trainer = entries.find((entry) => entry.clientId === 'trainer-dev');
+    expect(trainer?.status).toBe('rotated');
+    expect(trainer?.secret).toBeTruthy();
+  });
+
+  it('keeps the published test-client secret working across runs', async () => {
+    await seed(DATABASE_URL);
+    const response = await appToken();
+    expect(response.status).toBe(200);
   });
 });
 

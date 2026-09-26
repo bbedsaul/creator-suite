@@ -947,6 +947,7 @@ export type Database = {
         };
         Returns: boolean;
       };
+      grace_window: { Args: Record<PropertyKey, never>; Returns: string };
       mark_stale_dispatches: {
         Args: Record<PropertyKey, never>;
         Returns: {
