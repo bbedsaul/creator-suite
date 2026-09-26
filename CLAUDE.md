@@ -102,7 +102,8 @@ pnpm -F @suite/poster-service dev:worker
 pnpm -F @suite/poster-contract gen         # regenerate OpenAPI spec + client
 pnpm lint:deps                             # boundary check (D-022)
 pnpm lint:deps:verify                      # proves lint:deps rejects real violations
-pnpm -r build && pnpm -r test              # repo-wide gates
+pnpm -r build && pnpm -r typecheck         # build first: @suite/* resolve via dist
+pnpm -r test                               # repo-wide gates
 pnpm lint && pnpm format:check             # eslint, prettier
 ```
 
