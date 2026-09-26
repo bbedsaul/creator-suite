@@ -97,6 +97,9 @@ pnpm -F @suite/poster-service seed               # register dev client apps -> .
 pnpm -F @suite/poster-service seed -- --rotate   # issue new secrets (default preserves, D-051)
 pnpm gen:check                                   # committed spec + client match the schemas
 pnpm gen:types:check                             # committed DB types match the migrations
+pnpm -F @suite/poster-service seed:constraints   # load platform specs -> DB, enables them (D-058)
+pnpm lint:limits                                 # no platform limit hard-coded in TS (rule 9)
+pnpm lint:limits:verify                          # proves lint:limits rejects real violations
 pnpm -F @suite/poster-service dev:api      # backend alone — no frontend needed
 pnpm -F @suite/poster-service dev:worker
 pnpm -F @suite/poster-contract gen         # regenerate OpenAPI spec + client

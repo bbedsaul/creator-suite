@@ -12,6 +12,8 @@ import {
 } from '@suite/server-core';
 import { loadApiConfig, loadConfig } from '../config.js';
 import { createClientAppStore } from '../db/client-apps.js';
+import { createPlatformConstraintStore } from '../db/platform-constraints.js';
+import { createValidationContextStore } from '../db/validation-context.js';
 import { createPool } from '../db/pool.js';
 import { installShutdownHandlers } from '../shutdown.js';
 import { buildServer } from './server.js';
@@ -23,6 +25,8 @@ const sql = createPool({ databaseUrl: apiConfig.databaseUrl });
 
 const app = buildServer(config, {
   apps: createClientAppStore(sql),
+  constraints: createPlatformConstraintStore(sql),
+  validationContext: createValidationContextStore(sql),
   appTokens: createAppTokenSigner({
     secret: apiConfig.appTokenSecret,
     keyId: apiConfig.appTokenKeyId,

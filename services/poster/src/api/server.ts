@@ -5,11 +5,15 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import type { AppTokenSigner, RateLimiter, UserTokenVerifier } from '@suite/server-core';
 import type { ServiceConfig } from '../config.js';
 import type { ClientAppStore } from '../db/client-apps.js';
+import type { PlatformConstraintStore } from '../db/platform-constraints.js';
+import type { ValidationContextStore } from '../db/validation-context.js';
 import { registerAuth } from './plugins/auth.js';
 import { registerErrorHandling } from './plugins/errors.js';
 import { REQUEST_ID_HEADER, registerRequestId } from './plugins/request-id.js';
 import { registerAuthContextRoute } from './routes/auth-context.js';
 import { registerOAuthRoutes } from './routes/oauth.js';
+import { registerPlatformRoutes } from './routes/platforms.js';
+import { registerValidateRoute } from './routes/validate.js';
 
 export const SERVICE_NAME = 'poster-api';
 
@@ -27,6 +31,8 @@ export interface HealthResponse {
  */
 export interface ServerDeps {
   readonly apps: ClientAppStore;
+  readonly constraints: PlatformConstraintStore;
+  readonly validationContext: ValidationContextStore;
   readonly appTokens: AppTokenSigner;
   readonly userTokens: UserTokenVerifier;
   readonly rateLimiter: RateLimiter;
@@ -92,6 +98,17 @@ export function buildServer(config: ServiceConfig, deps: ServerDeps): FastifyIns
   });
 
   registerAuthContextRoute(app, { rateLimiter: deps.rateLimiter });
+
+  registerPlatformRoutes(app, {
+    constraints: deps.constraints,
+    rateLimiter: deps.rateLimiter,
+  });
+
+  registerValidateRoute(app, {
+    constraints: deps.constraints,
+    context: deps.validationContext,
+    rateLimiter: deps.rateLimiter,
+  });
 
   return app;
 }

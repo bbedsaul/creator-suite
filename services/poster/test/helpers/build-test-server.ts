@@ -18,9 +18,20 @@ import {
   type RateLimiter,
   type UserTokenVerifier,
 } from '@suite/server-core';
+import {
+  encodeId,
+  type MediaFacts,
+  type PlatformConstraints,
+  type PlatformConstraintSpec,
+} from '@suite/poster-contract';
 import { loadConfig } from '../../src/config.js';
 import { buildServer, type ServerDeps } from '../../src/api/server.js';
 import type { ClientApp, ClientAppStore } from '../../src/db/client-apps.js';
+import type { PlatformConstraintStore } from '../../src/db/platform-constraints.js';
+import type {
+  ResolvedConnection,
+  ValidationContextStore,
+} from '../../src/db/validation-context.js';
 
 export const APP_TOKEN_SECRET = 'a-test-signing-secret-at-least-32-chars';
 export const APP_TOKEN_ISSUER = 'poster-api';
@@ -90,6 +101,97 @@ export async function createFakeStore(
   };
 }
 
+/**
+ * Synthetic specs, not the real seeded ones: a unit test asserting on real
+ * platform numbers would break every time a platform moved, and the committed
+ * specs are covered by poster-contract's own tests and the integration suite.
+ */
+export const FAKE_SPECS: Record<string, PlatformConstraintSpec> = {
+  tiktok: {
+    provisional: true,
+    text: { max_length: 10, unit: 'utf16_code_units' },
+    media: { kinds: ['video'], mime_types: ['video/mp4'], min_count: 1, max_count: 1 },
+    video: { max_duration_s: 60, max_duration_is_per_account: true },
+    threads: { supported: false },
+    sources: [{ url: 'https://example.test/tiktok', retrieved: '2026-09-26' }],
+  },
+  youtube: {
+    provisional: true,
+    text: { max_length: 5000, unit: 'utf8_bytes', forbidden_characters: ['<', '>'] },
+    title: { max_length: 100, unit: 'characters' },
+    media: { kinds: ['video'], mime_types: ['video/mp4'], min_count: 1, max_count: 1 },
+    video: { max_duration_s: 43200, max_duration_is_per_account: true },
+    threads: { supported: false },
+    sources: [{ url: 'https://example.test/youtube', retrieved: '2026-09-26' }],
+  },
+};
+
+/** Deterministic public ids for the fixtures below. */
+export const TIKTOK_CONNECTION = encodeId('connection', '11111111-2222-4333-8444-555555555551');
+export const YOUTUBE_CONNECTION = encodeId('connection', '11111111-2222-4333-8444-555555555552');
+export const FOREIGN_CONNECTION = encodeId('connection', '99999999-2222-4333-8444-555555555559');
+export const VIDEO_MEDIA = encodeId('media', '22222222-3333-4444-8555-666666666661');
+
+export function createFakeConstraintStore(
+  specs: Record<string, PlatformConstraintSpec> = FAKE_SPECS,
+): PlatformConstraintStore {
+  const platforms: PlatformConstraints[] = Object.entries(specs).map(([platformId, spec]) => ({
+    platform_id: platformId,
+    display_name: platformId,
+    supports_threads: spec.threads.supported,
+    spec_version: 1,
+    updated_at: '2026-09-26T00:00:00.000Z',
+    spec,
+  }));
+
+  return {
+    listEnabled: () => Promise.resolve(platforms),
+    specsByPlatform: () => Promise.resolve(new Map(Object.entries(specs))),
+  };
+}
+
+export function createFakeValidationContext(
+  options: {
+    connections?: Record<string, string>;
+    media?: Record<string, MediaFacts>;
+  } = {},
+): ValidationContextStore {
+  const connections =
+    options.connections ??
+    ({ [TIKTOK_CONNECTION]: 'tiktok', [YOUTUBE_CONNECTION]: 'youtube' } as Record<string, string>);
+  const media =
+    options.media ??
+    ({
+      [VIDEO_MEDIA]: {
+        media_id: VIDEO_MEDIA,
+        kind: 'video',
+        mime_type: 'video/mp4',
+        duration_s: 30,
+        width: 1080,
+        height: 1920,
+      },
+    } as Record<string, MediaFacts>);
+
+  return {
+    resolveConnections(_userId, publicIds) {
+      const found = new Map<string, ResolvedConnection>();
+      for (const id of publicIds) {
+        const platformId = connections[id];
+        if (platformId !== undefined) found.set(id, { publicId: id, platformId });
+      }
+      return Promise.resolve(found);
+    },
+    resolveMedia(_userId, publicIds) {
+      const found = new Map<string, MediaFacts>();
+      for (const id of publicIds) {
+        const facts = media[id];
+        if (facts !== undefined) found.set(id, facts);
+      }
+      return Promise.resolve(found);
+    },
+  };
+}
+
 /** Stands in for Supabase: accepts exactly the tokens it was told about. */
 export function createFakeUserTokens(tokens: Record<string, string>): UserTokenVerifier {
   return {
@@ -132,6 +234,8 @@ export async function buildTestServer(
     { ...loadConfig(), logLevel: 'fatal' },
     {
       apps: store,
+      constraints: createFakeConstraintStore(),
+      validationContext: createFakeValidationContext(),
       appTokens,
       userTokens: overrides.userTokens ?? createFakeUserTokens({}),
       rateLimiter: limiter,

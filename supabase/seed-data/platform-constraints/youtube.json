@@ -1,0 +1,56 @@
+{
+  "platform_id": "youtube",
+  "spec_version": 1,
+  "spec": {
+    "provisional": true,
+    "text": {
+      "max_length": 5000,
+      "unit": "utf8_bytes",
+      "forbidden_characters": ["<", ">"]
+    },
+    "title": {
+      "max_length": 100,
+      "unit": "characters",
+      "forbidden_characters": ["<", ">"]
+    },
+    "media": {
+      "kinds": ["video"],
+      "mime_types": [
+        "video/mp4",
+        "video/quicktime",
+        "video/mpeg",
+        "video/webm",
+        "video/x-msvideo",
+        "video/x-ms-wmv",
+        "video/x-flv",
+        "video/3gpp"
+      ],
+      "min_count": 1,
+      "max_count": 1
+    },
+    "video": {
+      "max_duration_s": 43200,
+      "max_duration_is_per_account": true
+    },
+    "threads": {
+      "supported": false
+    },
+    "sources": [
+      {
+        "url": "https://developers.google.com/youtube/v3/docs/videos",
+        "retrieved": "2026-09-26",
+        "note": "snippet.title: 'maximum length of 100 characters'; snippet.description: 'maximum length of 5000 bytes'. Both 'may contain all valid UTF-8 characters except < and >', hence forbidden_characters. Note the units differ between the two fields, which is why unit is part of the spec."
+      },
+      {
+        "url": "https://support.google.com/youtube/answer/71673",
+        "retrieved": "2026-09-26",
+        "note": "'The maximum file size you can upload is 256 GB or 12 hours, whichever is less.' Unverified accounts are capped at 15 minutes, so 43200s is an optimistic ceiling and max_duration_is_per_account is true."
+      },
+      {
+        "url": "https://support.google.com/youtube/troubleshooter/2888402",
+        "retrieved": "2026-09-26",
+        "note": "Accepted containers: .MOV, .MPEG-1, .MPEG-2, .MPEG4, .MP4, .MPG, .AVI, .WMV, .MPEGPS, .FLV, 3GPP, WebM, DNxHR, ProRes, CineForm, HEVC. mime_types lists the corresponding MIME types for the containers a browser or ffprobe actually reports; the professional codecs (DNxHR, ProRes, CineForm) are omitted because we have no MIME mapping we can rely on."
+      }
+    ]
+  }
+}

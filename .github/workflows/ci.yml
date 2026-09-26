@@ -69,6 +69,13 @@ jobs:
       - name: Generated contract artifacts are current
         run: pnpm gen:check
 
+      # Platform limits are data, never TypeScript literals (rule 9, S04).
+      - name: No hard-coded platform limits
+        run: pnpm lint:limits
+
+      - name: Limit check can fail
+        run: pnpm lint:limits:verify
+
   # Everything that needs Postgres and Supabase auth.
   database:
     name: Migrations, pgTAP, integration
@@ -106,6 +113,12 @@ jobs:
       # Needs a live database, so it cannot live in the check job.
       - name: Generated database types are current
         run: pnpm gen:types:check
+
+      # Load the constraint specs the integration suite validates against.
+      - name: Seed platform constraints
+        run: pnpm -F @suite/poster-service seed:constraints
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
 
       - name: Integration tests
         run: pnpm -F @suite/poster-service test:integration

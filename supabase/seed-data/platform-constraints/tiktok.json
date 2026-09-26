@@ -1,0 +1,41 @@
+{
+  "platform_id": "tiktok",
+  "spec_version": 1,
+  "spec": {
+    "provisional": true,
+    "text": {
+      "max_length": 2200,
+      "unit": "utf16_code_units"
+    },
+    "media": {
+      "kinds": ["video"],
+      "mime_types": ["video/mp4", "video/quicktime", "video/webm"],
+      "min_count": 1,
+      "max_count": 1
+    },
+    "video": {
+      "max_duration_s": 600,
+      "max_duration_is_per_account": true
+    },
+    "threads": {
+      "supported": false
+    },
+    "sources": [
+      {
+        "url": "https://developers.tiktok.com/doc/content-posting-api-reference-direct-post",
+        "retrieved": "2026-09-26",
+        "note": "Caption: 'The maximum length is 2200 in UTF-16 runes.' Accepted upload Content-Types are MP4, QuickTime and WebM, which is where mime_types comes from."
+      },
+      {
+        "url": "https://developers.tiktok.com/doc/content-sharing-guidelines",
+        "retrieved": "2026-09-26",
+        "note": "'API clients must check if the duration of the to-be-posted video follows the max_video_post_duration_sec returned in the creator_info API.' This is why max_duration_is_per_account is true: 600s is an optimistic ceiling, not a guarantee, and the real limit is only knowable per creator at dispatch time."
+      },
+      {
+        "url": "https://www.tokportal.com/learn/tiktok-content-posting-api-developer-guide",
+        "retrieved": "2026-09-26",
+        "note": "Third-party, NOT authoritative: source of the 600s (10 minute) third-party-upload ceiling and of the claim that standalone image posts are unavailable through this flow, which is why kinds is video-only. Replace with aggregator-enforced limits in S09."
+      }
+    ]
+  }
+}

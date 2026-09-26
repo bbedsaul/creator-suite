@@ -11,6 +11,11 @@
 import { z } from 'zod';
 import { CONTRACT_VERSION } from './version.js';
 import { AuthContext, TokenRequest, TokenResponse } from './auth.js';
+import {
+  PlatformConstraintsResponse,
+  ValidatePostRequest,
+  ValidatePostResponse,
+} from './constraints.js';
 import { ErrorEnvelope } from './errors.js';
 
 type JsonSchema = Record<string, unknown>;
@@ -53,6 +58,9 @@ export function buildOpenApiDocument(): JsonSchema {
         TokenRequest: toSchema(TokenRequest),
         TokenResponse: toSchema(TokenResponse),
         AuthContext: toSchema(AuthContext),
+        PlatformConstraintsResponse: toSchema(PlatformConstraintsResponse),
+        ValidatePostRequest: toSchema(ValidatePostRequest),
+        ValidatePostResponse: toSchema(ValidatePostResponse),
         ErrorEnvelope: toSchema(ErrorEnvelope),
       },
     },
@@ -112,6 +120,61 @@ export function buildOpenApiDocument(): JsonSchema {
             },
             '401': errorResponse('Missing, malformed, or expired token.'),
             '403': errorResponse('User-mode token does not match the requested user_id.'),
+            '429': errorResponse('Per-app rate limit exceeded; honor Retry-After.'),
+          },
+        },
+      },
+      '/v1/platforms/constraints': {
+        get: {
+          operationId: 'getPlatformConstraints',
+          summary: 'Published platform limits, as data',
+          description:
+            'Every limit the constraint engine enforces, so no client hard-codes a platform ' +
+            'rule (CLAUDE.md rule 9). Each spec carries its own `sources` and a `provisional` ' +
+            'flag: while provisional, the numbers come from platform documentation rather ' +
+            'than the aggregator actually used to post, which is often stricter. Limits ' +
+            'marked `max_duration_is_per_account` are an optimistic ceiling that only the ' +
+            'platform can confirm for a given account.',
+          tags: ['platforms'],
+          security: [{ bearerAuth: [] }],
+          responses: {
+            '200': {
+              description: 'Constraints for every enabled platform.',
+              content: {
+                'application/json': { schema: ref('PlatformConstraintsResponse') },
+              },
+            },
+            '401': errorResponse('Missing, malformed, or expired token.'),
+            '429': errorResponse('Per-app rate limit exceeded; honor Retry-After.'),
+          },
+        },
+      },
+      '/v1/posts/validate': {
+        post: {
+          operationId: 'validatePost',
+          summary: 'Check a post against platform rules without creating it',
+          description:
+            'Runs exactly the validation POST /v1/posts runs, and returns exactly the same ' +
+            '422 envelope, so a composer can show per-platform warnings before submitting ' +
+            'rather than reimplementing the rules. Nothing is created and nothing is ' +
+            'reserved. A clean post returns 200; any violation returns 422 with one ' +
+            '`details` entry per failing target.',
+          tags: ['posts'],
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: { 'application/json': { schema: ref('ValidatePostRequest') } },
+          },
+          responses: {
+            '200': {
+              description: 'Every target passes.',
+              content: { 'application/json': { schema: ref('ValidatePostResponse') } },
+            },
+            '400': errorResponse('Malformed request body.'),
+            '401': errorResponse('Missing, malformed, or expired token.'),
+            '403': errorResponse('User-mode token does not match the requested user_id.'),
+            '404': errorResponse('A connection or media id does not exist for this user.'),
+            '422': errorResponse('One or more targets failed platform rules; see details.'),
             '429': errorResponse('Per-app rate limit exceeded; honor Retry-After.'),
           },
         },

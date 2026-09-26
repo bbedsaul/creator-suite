@@ -36,4 +36,32 @@ export {
 
 export { AUTH_MODES, AuthMode, AuthContext, TokenRequest, TokenResponse } from './auth.js';
 
+export {
+  TEXT_UNITS,
+  MEDIA_KINDS,
+  CONSTRAINT_VIOLATION_CODES,
+  TextUnit,
+  TextConstraint,
+  MediaKind,
+  MediaConstraint,
+  VideoConstraint,
+  AspectRatioConstraint,
+  ThreadConstraint,
+  SpecSource,
+  PlatformConstraintSpec,
+  PlatformConstraints,
+  PlatformConstraintsResponse,
+  MediaFacts,
+  TargetValidationInput,
+  ConstraintViolationCode,
+  PostContent,
+  TargetOverrides,
+  ValidateTargetRequest,
+  ValidatePostRequest,
+  ValidatePostResponse,
+  measureText,
+  validateTarget,
+  type Violation,
+} from './constraints.js';
+
 export { buildOpenApiDocument } from './openapi.js';

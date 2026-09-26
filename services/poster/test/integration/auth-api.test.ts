@@ -23,6 +23,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildServer } from '../../src/api/server.js';
 import { loadConfig } from '../../src/config.js';
 import { createClientAppStore } from '../../src/db/client-apps.js';
+import { createPlatformConstraintStore } from '../../src/db/platform-constraints.js';
+import { createValidationContextStore } from '../../src/db/validation-context.js';
 import { TEST_CLIENT_ID, TEST_CLIENT_SECRET, seed } from '../../src/seed.js';
 
 const DATABASE_URL =
@@ -108,6 +110,8 @@ beforeAll(async () => {
     { ...loadConfig(), logLevel: 'fatal', port: 0 },
     {
       apps: createClientAppStore(sql),
+      constraints: createPlatformConstraintStore(sql),
+      validationContext: createValidationContextStore(sql),
       appTokens: createAppTokenSigner({
         secret: APP_TOKEN_SECRET,
         keyId: 'k1',

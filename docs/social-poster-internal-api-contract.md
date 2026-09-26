@@ -1,6 +1,11 @@
-# Social Poster — Internal API Contract (v1.2)
+# Social Poster — Internal API Contract (v1.3)
 
-*Creator Suite · v1.2 2026-09-26 (v1.1 2026-09-26, v1 2026-09-19). Repo copy; this file is now the source of truth for implementation. The machine-readable form lives in `packages/poster-contract` (zod → OpenAPI, DECISIONS D-026), and the two must agree.*
+*Creator Suite · v1.3 2026-09-26 (v1.2 2026-09-26, v1.1 2026-09-26, v1 2026-09-19). Repo copy; this file is now the source of truth for implementation. The machine-readable form lives in `packages/poster-contract` (zod → OpenAPI, DECISIONS D-026), and the two must agree.*
+
+**v1.3 changes, all additive and non-breaking under §10:**
+- §5.1: `GET /v1/platforms/constraints` specified — the published limits, with provenance and a `provisional` flag (D-058).
+- §5.2: `POST /v1/posts/validate` added — the same checks as submission, without creating anything (D-057).
+- §8: new constraint codes `media_required` and `text_invalid_characters` (D-056). Clients ignore unknown constraint codes, so this is additive.
 
 **v1.2 changes, all additive and non-breaking under §10:**
 - §2: `expires_in` on the token response, and a new `GET /v1/auth/context` endpoint reporting the acting app and user (D-048).
@@ -136,6 +141,44 @@ Idempotency-Key: trainer-lesson-42-clip-3
 - Omitted `schedule_at` means dispatch immediately. `POST /v1/posts/{id}/cancel` works until dispatch begins (targets in `accepted`, `scheduled`, or `paused`); `PATCH` before dispatch re-validates constraints (FR-13).
 - Threads (FR-08): `content.thread` as an ordered array on platforms that support it; validation rejects it elsewhere.
 
+### 5.1 Platform constraints *(v1.3)*
+
+```
+GET /v1/platforms/constraints
+→ { "platforms": [
+      { "platform_id": "tiktok", "display_name": "TikTok",
+        "supports_threads": false, "spec_version": 1,
+        "updated_at": "2026-09-26T00:00:00Z",
+        "spec": {
+          "text":  { "max_length": 2200, "unit": "utf16_code_units" },
+          "media": { "kinds": ["video"], "mime_types": ["video/mp4", …],
+                     "min_count": 1, "max_count": 1 },
+          "video": { "max_duration_s": 600, "max_duration_is_per_account": true },
+          "threads": { "supported": false },
+          "provisional": true,
+          "sources": [ { "url": "…", "retrieved": "2026-09-26", "note": "…" } ] } } ] }
+```
+
+Never hard-code a platform rule; read it from here. Three parts of a spec matter as much as the numbers:
+
+- **`unit`** — a length budget is meaningless without it. TikTok counts a caption in UTF-16 code units (its "runes"), a YouTube description is budgeted in UTF-8 **bytes**, and a YouTube title in characters. A caption of emoji hits the TikTok limit at half the visible characters.
+- **`max_duration_is_per_account`** — when true, the value is an optimistic platform ceiling and the real limit belongs to the account. TikTok returns `max_video_post_duration_sec` per creator, and YouTube caps unverified accounts at 15 minutes. A target that passes validation may still be refused by the platform, which surfaces as `platform_rejected`.
+- **`provisional`** and **`sources`** — while `provisional` is true the numbers come from platform documentation rather than the aggregator actually used to post, which is usually stricter (OQ-1). Every value cites where it came from.
+
+Only enabled platforms appear. A platform without a published spec is not unconstrained, it is unlaunched: the API refuses to accept targets it cannot validate.
+
+### 5.2 Validating without submitting *(v1.3)*
+
+```
+POST /v1/posts/validate
+{ "user_id": "…", "content": { … }, "targets": [ { "connection_id": "cn_…" }, … ] }
+→ 200 { "valid": true,
+        "targets": [ { "target_index": 0, "connection_id": "cn_…", "platform_id": "tiktok" } ] }
+→ 422 the §8 constraint_violation envelope
+```
+
+Runs exactly the validation `POST /v1/posts` runs and returns exactly the same 422, so a composer can show per-platform warnings before submitting instead of reimplementing the rules. Nothing is created and nothing is reserved. An unknown `connection_id` or media id is `404 not_found` rather than a validation failure — it is not a content problem, and the API does not confirm ids belonging to other users.
+
 ## 6. Post lifecycle & states
 
 State lives **per target** — a post to TikTok and YouTube can succeed on one and fail on the other. The logical post's state is derived (posted when all targets posted, `partial` when mixed).
@@ -227,7 +270,7 @@ Every envelope carries `request_id`, which is also returned in the `X-Request-Id
 | 429 | `rate_limited` | Per-app limit; honor `Retry-After` |
 | 500 | `internal_error` *(v1.2)* | Unexpected failure; the message is deliberately generic |
 
-Constraint codes (extensible; clients ignore unknown ones): `text_too_long`, `video_too_long`, `media_unsupported_format`, `aspect_ratio_invalid`, `thread_not_supported`, `too_many_media`. Runtime failures use `reason_class` on `post.failed` (extensible; clients handle unknown values as generic failure):
+Constraint codes (extensible; clients ignore unknown ones): `text_too_long`, `video_too_long`, `media_unsupported_format`, `aspect_ratio_invalid`, `thread_not_supported`, `too_many_media`, `media_required` *(v1.3)* — the platform cannot post without media, and `text_invalid_characters` *(v1.3)* — the text contains characters the platform refuses outright. One `details` entry is returned per violation, so a target that breaks two rules produces two entries with the same `target_index`. Runtime failures use `reason_class` on `post.failed` (extensible; clients handle unknown values as generic failure):
 
 | `reason_class` | Meaning | Client action |
 | --- | --- | --- |

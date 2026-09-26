@@ -18,7 +18,9 @@
     "gen:check": "node scripts/check-generated.mjs contract",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "gen:types:check": "node scripts/check-generated.mjs db-types"
+    "gen:types:check": "node scripts/check-generated.mjs db-types",
+    "lint:limits": "node scripts/check-platform-literals.mjs",
+    "lint:limits:verify": "node scripts/check-platform-literals.mjs --self-test"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

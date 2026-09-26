@@ -53,6 +53,46 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/v1/platforms/constraints': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Published platform limits, as data
+     * @description Every limit the constraint engine enforces, so no client hard-codes a platform rule (CLAUDE.md rule 9). Each spec carries its own `sources` and a `provisional` flag: while provisional, the numbers come from platform documentation rather than the aggregator actually used to post, which is often stricter. Limits marked `max_duration_is_per_account` are an optimistic ceiling that only the platform can confirm for a given account.
+     */
+    get: operations['getPlatformConstraints'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/posts/validate': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Check a post against platform rules without creating it
+     * @description Runs exactly the validation POST /v1/posts runs, and returns exactly the same 422 envelope, so a composer can show per-platform warnings before submitting rather than reimplementing the rules. Nothing is created and nothing is reserved. A clean post returns 200; any violation returns 422 with one `details` entry per failing target.
+     */
+    post: operations['validatePost'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -90,6 +130,121 @@ export interface components {
        * @description The user this request acts on behalf of, or null in app mode with no user.
        */
       user_id: string | null;
+    };
+    /** @description Published platform limits, so no client ever hard-codes them. */
+    PlatformConstraintsResponse: {
+      platforms: {
+        platform_id: string;
+        display_name: string;
+        supports_threads: boolean;
+        spec_version: number;
+        updated_at: string;
+        /** @description Everything needed to validate one target for one platform. */
+        spec: {
+          /** @description The main caption or body. */
+          text: {
+            max_length: number;
+            /**
+             * @description How the platform counts length. utf16_code_units is what TikTok calls "runes"; utf8_bytes is a byte budget (YouTube descriptions); characters counts code points.
+             * @enum {string}
+             */
+            unit: 'utf16_code_units' | 'utf8_bytes' | 'characters';
+            /** @description Characters the platform rejects outright, e.g. < and > on YouTube. */
+            forbidden_characters?: string[];
+          };
+          /** @description Separate title field, where the platform has one. */
+          title?: {
+            max_length: number;
+            /**
+             * @description How the platform counts length. utf16_code_units is what TikTok calls "runes"; utf8_bytes is a byte budget (YouTube descriptions); characters counts code points.
+             * @enum {string}
+             */
+            unit: 'utf16_code_units' | 'utf8_bytes' | 'characters';
+            /** @description Characters the platform rejects outright, e.g. < and > on YouTube. */
+            forbidden_characters?: string[];
+          };
+          /** @description What may be attached, and how much of it. */
+          media: {
+            /** @description Media kinds this platform accepts at all. */
+            kinds: ('image' | 'video')[];
+            /** @description Accepted MIME types. */
+            mime_types: string[];
+            min_count: number;
+            max_count: number;
+          };
+          /** @description Duration limits for video. */
+          video?: {
+            max_duration_s: number;
+            /** @description True when the platform’s real ceiling is per-account and only knowable at dispatch time (TikTok returns max_video_post_duration_sec per creator). The value here is then the optimistic platform maximum, and a target passing validation may still be rejected by the platform. */
+            max_duration_is_per_account: boolean;
+          };
+          /** @description Accepted width/height range. */
+          aspect_ratio?: {
+            /** @description Minimum width/height, as a decimal. */
+            min: number;
+            /** @description Maximum width/height, as a decimal. */
+            max: number;
+            /** @description Slack on both ends, so 1079x1920 is not rejected for being one pixel off. */
+            tolerance: number;
+          };
+          /** @description Whether ordered multi-part posts are possible (FR-08). */
+          threads: {
+            supported: boolean;
+            max_parts?: number;
+          };
+          /** @description Citations for every limit above. */
+          sources: {
+            /** Format: uri */
+            url: string;
+            /** @description ISO date the value was read from that page. */
+            retrieved: string;
+            note?: string;
+          }[];
+          /** @description True while the numbers come from platform documentation rather than the aggregator we actually post through. The aggregator is often stricter, so S09 replaces these (OQ-1). */
+          provisional: boolean;
+        };
+      }[];
+    };
+    /** @description A post submission to check without creating anything. */
+    ValidatePostRequest: {
+      /**
+       * Format: uuid
+       * @description The user whose connections and media these are.
+       */
+      user_id: string;
+      /** @description What to post, before per-target overrides. */
+      content: {
+        /** @description Default caption for every target. */
+        text?: string;
+        /** @description Default title, for platforms that have one. */
+        title?: string;
+        /** @description Public media ids, in order. */
+        media?: string[];
+        /** @description Ordered multi-part post (FR-08). Rejected on platforms without threads. */
+        thread?: {
+          text: string;
+          media?: string[];
+        }[];
+      };
+      targets: {
+        /** @description Public connection id, e.g. cn_… */
+        connection_id: string;
+        /** @description Per-platform replacements for the default content. */
+        overrides?: {
+          text?: string;
+          title?: string;
+        };
+      }[];
+    };
+    /** @description Returned only when every target passes. Failures use the §8 422 envelope. */
+    ValidatePostResponse: {
+      /** @enum {boolean} */
+      valid: true;
+      targets: {
+        target_index: number;
+        connection_id: string;
+        platform_id: string;
+      }[];
     };
     /** @description The single error envelope used by every non-2xx response. */
     ErrorEnvelope: {
@@ -137,6 +292,10 @@ export interface components {
 export type SchemaTokenRequest = components['schemas']['TokenRequest'];
 export type SchemaTokenResponse = components['schemas']['TokenResponse'];
 export type SchemaAuthContext = components['schemas']['AuthContext'];
+export type SchemaPlatformConstraintsResponse =
+  components['schemas']['PlatformConstraintsResponse'];
+export type SchemaValidatePostRequest = components['schemas']['ValidatePostRequest'];
+export type SchemaValidatePostResponse = components['schemas']['ValidatePostResponse'];
 export type SchemaErrorEnvelope = components['schemas']['ErrorEnvelope'];
 export type $defs = Record<string, never>;
 export interface operations {
@@ -223,6 +382,122 @@ export interface operations {
       };
       /** @description User-mode token does not match the requested user_id. */
       403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description Per-app rate limit exceeded; honor Retry-After. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+    };
+  };
+  getPlatformConstraints: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Constraints for every enabled platform. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PlatformConstraintsResponse'];
+        };
+      };
+      /** @description Missing, malformed, or expired token. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description Per-app rate limit exceeded; honor Retry-After. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+    };
+  };
+  validatePost: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ValidatePostRequest'];
+      };
+    };
+    responses: {
+      /** @description Every target passes. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ValidatePostResponse'];
+        };
+      };
+      /** @description Malformed request body. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description Missing, malformed, or expired token. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description User-mode token does not match the requested user_id. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description A connection or media id does not exist for this user. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description One or more targets failed platform rules; see details. */
+      422: {
         headers: {
           [name: string]: unknown;
         };
