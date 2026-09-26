@@ -76,6 +76,11 @@ DECISIONS.md            judgment calls, append-only
 - Commit at session end and tag it `poster-m1-sNN` (for example, `poster-m1-s03`).
 - If a task would change the API contract, stop and ask. Additive changes are allowed only if they're recorded in DECISIONS.md.
 
+## Project skills
+
+Skills live in `.claude/skills/` and load automatically when relevant:
+`run-session` (every session), `db-migration` (any SQL), `contract-change` (any API shape), `platform-adapter` (publishing adapters), `creator-suite-ui` (anything in `apps/` or `packages/ui`), and `media-pipeline` (ingest, transcription, LLM passes, rendering).
+
 ## Commands
 
 ```

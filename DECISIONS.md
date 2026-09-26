@@ -77,6 +77,8 @@ Rules: a backend starts, runs, and passes its tests with no frontend present. Fr
 
 **D-028 · Note · 2026-09-26** — The Trainer v2 migration set isn't in this repo yet (it was never exported from the planning chat). Bring it in when the Trainer starts, renamed per D-021.
 
+**D-029 · Decided · 2026-09-26** — Six project skills live in `.claude/skills/`, versioned with the code: run-session, db-migration, contract-change, platform-adapter, creator-suite-ui, and media-pipeline. Changes to a skill follow the same commit rules as code.
+
 ## Open (from PRDs, not blocking M1)
 
 - **Trainer sales pages rendering (SPA vs SSR):** decide at Trainer start (D-025).
