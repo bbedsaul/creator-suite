@@ -1,0 +1,35 @@
+{
+  "name": "@suite/poster-contract",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Source of truth for the Social Poster internal API: zod schemas -> OpenAPI spec (D-026).",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "openapi.json"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "gen": "node scripts/gen.mjs",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.1",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

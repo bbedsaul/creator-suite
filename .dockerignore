@@ -1,0 +1,13 @@
+# Build context is the repo root: a workspace service needs the root manifests
+# and its workspace dependencies, not just its own directory.
+**/node_modules
+**/dist
+**/coverage
+**/*.log
+.git
+.github
+.claude
+apps
+docs
+supabase
+*.md

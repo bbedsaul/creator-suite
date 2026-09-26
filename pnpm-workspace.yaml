@@ -1,0 +1,9 @@
+packages:
+  - 'services/*'
+  - 'apps/*'
+  - 'packages/*'
+  - 'tools/*'
+
+onlyBuiltDependencies:
+  - esbuild
+  - supabase

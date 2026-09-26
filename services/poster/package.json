@@ -1,0 +1,31 @@
+{
+  "name": "@suite/poster-service",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Social Poster backend: Fastify API and dispatch worker, two entrypoints from one package (D-022).",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "dev:api": "pnpm --filter='@suite/poster-service^...' build && exec tsx watch src/api/index.ts",
+    "dev:worker": "pnpm --filter='@suite/poster-service^...' build && exec tsx watch src/worker/index.ts",
+    "start:api": "node dist/api/index.js",
+    "start:worker": "node dist/worker/index.js",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@suite/server-core": "workspace:*",
+    "fastify": "^5.6.1",
+    "pino": "^9.13.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

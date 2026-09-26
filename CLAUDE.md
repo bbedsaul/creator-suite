@@ -83,13 +83,28 @@ Skills live in `.claude/skills/` and load automatically when relevant:
 
 ## Commands
 
+Node 22 is required (`.nvmrc`); run `nvm use` first. The Supabase CLI is a repo
+dev dependency, not a global install (D-031), so it runs through `pnpm exec`.
+
 ```
 pnpm install
-supabase start && supabase db reset      # applies all migrations
-supabase test db                         # pgTAP
+pnpm exec supabase start && pnpm exec supabase db reset   # applies all migrations
+pnpm exec supabase test db                 # pgTAP
 pnpm -F @suite/poster-service test
 pnpm -F @suite/poster-service dev:api      # backend alone — no frontend needed
 pnpm -F @suite/poster-service dev:worker
 pnpm -F @suite/poster-contract gen         # regenerate OpenAPI spec + client
-pnpm lint:deps                              # boundary check
+pnpm lint:deps                             # boundary check (D-022)
+pnpm lint:deps:verify                      # proves lint:deps rejects real violations
+pnpm -r build && pnpm -r test              # repo-wide gates
+pnpm lint && pnpm format:check             # eslint, prettier
+```
+
+Container images (one image, two entrypoints — D-034). Build context is the repo
+root, not the service directory:
+
+```
+docker build -f services/poster/Dockerfile -t poster-service .
+docker run -p 8080:8080 poster-service                      # API (default CMD)
+docker run poster-service node dist/worker/index.js         # worker
 ```

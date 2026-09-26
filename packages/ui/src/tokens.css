@@ -1,0 +1,87 @@
+/**
+ * Creator Suite design tokens (D-003).
+ *
+ * The only place raw values are allowed to appear. Components reference these
+ * variables and never hex codes or pixel font sizes.
+ *
+ * ============================================================================
+ * PLACEHOLDER FILE — every value below is a stand-in, not the design system.
+ * The real tokens are exported from the Creator Suite design system before the
+ * first screen is built in M3. Do not ship these values to production, and do
+ * not treat any value here as a design decision.
+ * ============================================================================
+ */
+
+:root {
+  /* Color — light. TODO: export from design system */
+  --color-bg: #fbf9f7;
+  --color-surface: #ffffff;
+  --color-border: #e7e2dc;
+  --color-text: #1c1a18;
+  --color-text-muted: #6b6560;
+  --color-accent: #0f766e;
+  --color-accent-contrast: #ffffff;
+  --color-success: #15803d;
+  --color-warning: #b45309;
+  --color-danger: #b42318;
+  --color-info: #0e7490;
+
+  /* Type. TODO: export from design system (Sora display, Instrument Sans body) */
+  --font-display: 'Sora', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-body: 'Instrument Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* Size scale. TODO: export from design system */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.25rem;
+
+  /* Space. TODO: export from design system */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+
+  /* Radius. TODO: export from design system */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 999px;
+
+  /* Shadow. TODO: export from design system */
+  --shadow-sm: 0 1px 2px rgb(28 26 24 / 6%);
+  --shadow-md: 0 4px 12px rgb(28 26 24 / 8%);
+  --shadow-lg: 0 12px 32px rgb(28 26 24 / 12%);
+
+  /* Motion. TODO: export from design system */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+}
+
+/**
+ * Dark values. The first screens are light-mode only, but components must not
+ * hard-code light assumptions, so the dark scope exists from the start.
+ * TODO: export from design system
+ */
+[data-theme='dark'] {
+  --color-bg: #17150f;
+  --color-surface: #211e18;
+  --color-border: #332f27;
+  --color-text: #f5f2ed;
+  --color-text-muted: #a49c92;
+  --color-accent: #2dd4bf;
+  --color-accent-contrast: #10201e;
+  --color-success: #4ade80;
+  --color-warning: #fbbf24;
+  --color-danger: #f87171;
+  --color-info: #38bdf8;
+}

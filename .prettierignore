@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+pnpm-lock.yaml
+supabase/.branches/
+supabase/.temp/
+
+# Markdown is authored prose here: PRDs, the API contract, DECISIONS, and the
+# session plan are source-of-truth documents and are not reflowed by a formatter.
+*.md
+docs/
