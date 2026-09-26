@@ -91,6 +91,8 @@ pnpm install
 pnpm exec supabase start && pnpm exec supabase db reset   # applies all migrations
 pnpm exec supabase test db                 # pgTAP
 pnpm -F @suite/poster-service test
+pnpm -F @suite/poster-service test:integration   # needs a running local stack (D-040)
+pnpm -F @suite/poster-service gen:types          # regenerate DB types after a migration
 pnpm -F @suite/poster-service dev:api      # backend alone — no frontend needed
 pnpm -F @suite/poster-service dev:worker
 pnpm -F @suite/poster-contract gen         # regenerate OpenAPI spec + client

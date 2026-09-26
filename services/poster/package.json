@@ -11,6 +11,8 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "gen:types": "node scripts/gen-types.mjs",
     "dev:api": "pnpm --filter='@suite/poster-service^...' build && exec tsx watch src/api/index.ts",
     "dev:worker": "pnpm --filter='@suite/poster-service^...' build && exec tsx watch src/worker/index.ts",
     "start:api": "node dist/api/index.js",
@@ -20,7 +22,8 @@
   "dependencies": {
     "@suite/server-core": "workspace:*",
     "fastify": "^5.6.1",
-    "pino": "^9.13.1"
+    "pino": "^9.13.1",
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
     "@types/node": "^24.19.0",

@@ -1,0 +1,44 @@
+-- Shared fixture for the Poster pgTAP suites. Included with \ir, which resolves
+-- relative to the including test file.
+--
+-- Two deliberate constraints shape where this file lives and what it is called:
+--   * `supabase test db` mounts only supabase/tests/ into the runner container,
+--     so the fixture has to live under it.
+--   * The runner executes every *.sql under supabase/tests/ as a test file, and
+--     this one has no plan and no transaction of its own — run directly it would
+--     COMMIT these rows into the database. The .psql extension keeps it out of
+--     that glob. Do not rename it to .sql.
+--
+-- Two users so cross-tenant isolation is testable, two connections for user A so
+-- a post can have more than one target (post_targets is unique per
+-- post+connection), and one grant so connection.* events have an audience.
+--
+-- Deterministic UUIDs: user A 1111…, user B aaaa…, apps 2222…, credentials 3333…,
+-- connections 4444…, posts 5555…, targets 6666…, grants 7777… .
+
+insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at) values
+  ('11111111-1111-1111-1111-111111111111','00000000-0000-0000-0000-000000000000','authenticated','authenticated','a@example.test','x',now(),now()),
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','00000000-0000-0000-0000-000000000000','authenticated','authenticated','b@example.test','x',now(),now());
+
+insert into poster.client_apps (id, client_id, name, client_secret_hash, first_party) values
+  ('22222222-2222-2222-2222-222222222222','test-client','Test Client','argon2id-placeholder', false),
+  ('22222222-2222-2222-2222-222222222223','other-client','Other Client','argon2id-placeholder', false);
+
+insert into poster.credentials (id, user_id, kind, provider, ciphertext, wrapped_dek, kms_key_id, nonce) values
+  ('33333333-3333-3333-3333-333333333333','11111111-1111-1111-1111-111111111111','aggregator_profile','ayrshare','\x01','\x02','kms-test','\x03'),
+  ('33333333-3333-3333-3333-33333333333b','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','aggregator_profile','ayrshare','\x01','\x02','kms-test','\x03');
+
+insert into poster.connections (id, user_id, platform_id, credential_id, external_account_id, handle) values
+  ('44444444-4444-4444-4444-444444444444','11111111-1111-1111-1111-111111111111','tiktok', '33333333-3333-3333-3333-333333333333','tt-a','@a_tiktok'),
+  ('44444444-4444-4444-4444-444444444445','11111111-1111-1111-1111-111111111111','youtube','33333333-3333-3333-3333-333333333333','yt-a','@a_youtube'),
+  ('44444444-4444-4444-4444-4444bbbbbbbb','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','tiktok', '33333333-3333-3333-3333-33333333333b','tt-b','@b_tiktok');
+
+insert into poster.grants (id, app_id, user_id, connection_id, scopes) values
+  ('77777777-7777-7777-7777-777777777771','22222222-2222-2222-2222-222222222222','11111111-1111-1111-1111-111111111111','44444444-4444-4444-4444-444444444444','{publish}');
+
+insert into poster.posts (id, user_id, app_id, external_ref, content) values
+  ('55555555-5555-5555-5555-555555555555','11111111-1111-1111-1111-111111111111','22222222-2222-2222-2222-222222222222','ext-a','{"text":"user A post"}'),
+  ('55555555-5555-5555-5555-55555555555b','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','22222222-2222-2222-2222-222222222222','ext-b','{"text":"user B post"}');
+
+-- Events emitted while building the fixture are noise for the assertions.
+delete from poster.webhook_events;
