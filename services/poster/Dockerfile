@@ -8,7 +8,7 @@
 # service needs the root manifests and its workspace dependencies:
 #   docker build -f services/poster/Dockerfile -t poster-service .
 
-FROM node:22-alpine AS base
+FROM node:24-alpine AS base
 ENV PNPM_HOME=/pnpm \
     PATH=/pnpm:$PATH \
     CI=true
@@ -39,7 +39,7 @@ RUN pnpm --filter '@suite/poster-service...' build \
     && pnpm --filter '@suite/poster-service' --prod --legacy deploy /out
 
 # --- runtime -----------------------------------------------------------------
-FROM node:22-alpine AS runtime
+FROM node:24-alpine AS runtime
 ENV NODE_ENV=production \
     PORT=8080 \
     HOST=0.0.0.0

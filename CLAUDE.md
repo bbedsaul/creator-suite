@@ -20,7 +20,7 @@ If code and a doc disagree, stop and ask. Don't silently pick one.
 
 ## Stack
 
-- TypeScript (strict) on Node 22, pnpm workspaces.
+- TypeScript (strict) on Node 24 (Active LTS, D-037), pnpm workspaces.
 - Supabase: Postgres, auth, and storage with RLS. Migrations live in `supabase/migrations/`, using timestamp-prefixed names as the Supabase CLI requires.
 - **Backends and frontends are separate projects (D-022).** Each backend under `services/` starts and deploys on its own; each UI under `apps/` talks to it only over HTTP.
 - `services/poster` has two entrypoints from one package:
@@ -83,7 +83,7 @@ Skills live in `.claude/skills/` and load automatically when relevant:
 
 ## Commands
 
-Node 22 is required (`.nvmrc`); run `nvm use` first. The Supabase CLI is a repo
+Node 24 is required (`.nvmrc`); run `nvm use` first. The Supabase CLI is a repo
 dev dependency, not a global install (D-031), so it runs through `pnpm exec`.
 
 ```
