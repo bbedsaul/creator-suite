@@ -19,16 +19,19 @@ jobs:
   # breakage that happens most often.
   check:
     name: Typecheck, test, lint
-    runs-on: ubuntu-latest
+    # Pinned rather than ubuntu-latest: that label migrates to Ubuntu 26 on
+    # 2026-10-19, and an image change landing mid-milestone is a debugging
+    # session nobody asked for. Revisit after M1 exits (S10).
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # pnpm before setup-node: setup-node's pnpm cache needs pnpm on PATH to
       # locate the store. Version comes from the packageManager field.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -69,14 +72,14 @@ jobs:
   # Everything that needs Postgres and Supabase auth.
   database:
     name: Migrations, pgTAP, integration
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: pnpm
