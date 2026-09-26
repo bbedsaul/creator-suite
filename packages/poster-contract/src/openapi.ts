@@ -16,6 +16,14 @@ import {
   ValidatePostRequest,
   ValidatePostResponse,
 } from './constraints.js';
+import { Media, SignedUploadRequest, SignedUploadResponse } from './media.js';
+import {
+  CancelPostResponse,
+  PatchPostRequest,
+  Post,
+  PostDetail,
+  SubmitPostRequest,
+} from './posts.js';
 import { ErrorEnvelope } from './errors.js';
 
 type JsonSchema = Record<string, unknown>;
@@ -61,6 +69,14 @@ export function buildOpenApiDocument(): JsonSchema {
         PlatformConstraintsResponse: toSchema(PlatformConstraintsResponse),
         ValidatePostRequest: toSchema(ValidatePostRequest),
         ValidatePostResponse: toSchema(ValidatePostResponse),
+        Media: toSchema(Media),
+        SignedUploadRequest: toSchema(SignedUploadRequest),
+        SignedUploadResponse: toSchema(SignedUploadResponse),
+        SubmitPostRequest: toSchema(SubmitPostRequest),
+        Post: toSchema(Post),
+        PostDetail: toSchema(PostDetail),
+        PatchPostRequest: toSchema(PatchPostRequest),
+        CancelPostResponse: toSchema(CancelPostResponse),
         ErrorEnvelope: toSchema(ErrorEnvelope),
       },
     },
@@ -176,6 +192,180 @@ export function buildOpenApiDocument(): JsonSchema {
             '404': errorResponse('A connection or media id does not exist for this user.'),
             '422': errorResponse('One or more targets failed platform rules; see details.'),
             '429': errorResponse('Per-app rate limit exceeded; honor Retry-After.'),
+          },
+        },
+      },
+      '/v1/media': {
+        post: {
+          operationId: 'createMedia',
+          summary: 'Upload media, or get a signed URL to upload it directly',
+          description:
+            'Two paths, chosen by Content-Type. `multipart/form-data` sends the bytes ' +
+            'through the API, which stores and probes them and returns a ready media row; ' +
+            'it is capped in size. `application/json` returns a signed upload URL instead, ' +
+            'for large video that should not pass through the API process — PUT the bytes ' +
+            'to that URL and then call /complete. Media is uploaded once and referenced by ' +
+            'id from any number of posts (FR-07).',
+          tags: ['media'],
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              'multipart/form-data': {
+                schema: {
+                  type: 'object',
+                  required: ['user_id', 'file'],
+                  properties: {
+                    user_id: { type: 'string', format: 'uuid' },
+                    file: { type: 'string', format: 'binary' },
+                  },
+                },
+              },
+              'application/json': { schema: ref('SignedUploadRequest') },
+            },
+          },
+          responses: {
+            '201': {
+              description: 'Stored and probed (multipart path).',
+              content: { 'application/json': { schema: ref('Media') } },
+            },
+            '202': {
+              description: 'Signed URL issued; nothing is usable until /complete.',
+              content: { 'application/json': { schema: ref('SignedUploadResponse') } },
+            },
+            '400': errorResponse('Malformed request, unsupported type, or file too large.'),
+            '401': errorResponse('Missing, malformed, or expired token.'),
+            '403': errorResponse('User-mode token does not match the requested user_id.'),
+            '429': errorResponse('Per-app rate limit exceeded; honor Retry-After.'),
+          },
+        },
+      },
+      '/v1/media/{media_id}/complete': {
+        post: {
+          operationId: 'completeMedia',
+          summary: 'Finish a signed-URL upload',
+          description:
+            'Probes the uploaded object for duration and dimensions and marks the media ' +
+            'ready. Until this succeeds the media cannot be posted, and referencing it ' +
+            'yields the `media_not_ready` constraint code.',
+          tags: ['media'],
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { name: 'media_id', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: {
+            '200': {
+              description: 'Probed and ready.',
+              content: { 'application/json': { schema: ref('Media') } },
+            },
+            '400': errorResponse('The object is missing or could not be probed.'),
+            '401': errorResponse('Missing, malformed, or expired token.'),
+            '404': errorResponse('No such media for this user.'),
+          },
+        },
+      },
+      '/v1/posts': {
+        post: {
+          operationId: 'submitPost',
+          summary: 'Submit a post to one or more connected accounts',
+          description:
+            'Validates every target and creates all of them or none (§5). Send an ' +
+            '`Idempotency-Key` header: the same key with the same body returns the ' +
+            'original result, and the same key with a different body is 409 ' +
+            '`idempotency_conflict`. Keys are scoped per app and kept at least 24 hours. ' +
+            'Omitting `schedule_at` means dispatch as soon as the post is ready.',
+          tags: ['posts'],
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'Idempotency-Key',
+              in: 'header',
+              required: false,
+              schema: { type: 'string', maxLength: 255 },
+              description: 'Strongly recommended. Without it a retry creates a second post.',
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: { 'application/json': { schema: ref('SubmitPostRequest') } },
+          },
+          responses: {
+            '202': {
+              description: 'Accepted; targets created.',
+              content: { 'application/json': { schema: ref('Post') } },
+            },
+            '400': errorResponse('Malformed request body.'),
+            '401': errorResponse('Missing, malformed, or expired token.'),
+            '403': errorResponse('forbidden_user, or grant_missing for a connection.'),
+            '404': errorResponse('A connection or media id does not exist for this user.'),
+            '409': errorResponse('Same Idempotency-Key with a different body.'),
+            '422': errorResponse('One or more targets failed platform rules; see details.'),
+            '429': errorResponse('Per-app rate limit exceeded; honor Retry-After.'),
+          },
+        },
+      },
+      '/v1/posts/{post_id}': {
+        get: {
+          operationId: 'getPost',
+          summary: 'Read a post and its targets',
+          tags: ['posts'],
+          security: [{ bearerAuth: [] }],
+          parameters: [{ name: 'post_id', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: {
+            '200': {
+              description: 'The post, with per-target state and outcomes.',
+              content: { 'application/json': { schema: ref('PostDetail') } },
+            },
+            '401': errorResponse('Missing, malformed, or expired token.'),
+            '404': errorResponse('No such post for this app and user.'),
+          },
+        },
+        patch: {
+          operationId: 'patchPost',
+          summary: 'Edit a post before dispatch',
+          description:
+            'Re-validates constraints (FR-13). Refused with 409 `too_late` once any target ' +
+            'has begun dispatching, because the content may already be on its way.',
+          tags: ['posts'],
+          security: [{ bearerAuth: [] }],
+          parameters: [{ name: 'post_id', in: 'path', required: true, schema: { type: 'string' } }],
+          requestBody: {
+            required: true,
+            content: { 'application/json': { schema: ref('PatchPostRequest') } },
+          },
+          responses: {
+            '200': {
+              description: 'Updated and re-validated.',
+              content: { 'application/json': { schema: ref('PostDetail') } },
+            },
+            '400': errorResponse('Malformed request body.'),
+            '401': errorResponse('Missing, malformed, or expired token.'),
+            '403': errorResponse('forbidden_user, or grant_missing for a connection.'),
+            '404': errorResponse('No such post, connection, or media for this user.'),
+            '409': errorResponse('A target is already dispatching.'),
+            '422': errorResponse('The edit fails platform rules; see details.'),
+          },
+        },
+      },
+      '/v1/posts/{post_id}/cancel': {
+        post: {
+          operationId: 'cancelPost',
+          summary: 'Cancel a post before dispatch',
+          description:
+            'Cancels every target that has not begun dispatching (§6). Returns 409 ' +
+            '`too_late` when nothing could be canceled. A post already canceled returns ' +
+            '200 with an empty `canceled_target_ids`, so a retry is safe.',
+          tags: ['posts'],
+          security: [{ bearerAuth: [] }],
+          parameters: [{ name: 'post_id', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: {
+            '200': {
+              description: 'Cancel applied, or already canceled.',
+              content: { 'application/json': { schema: ref('CancelPostResponse') } },
+            },
+            '401': errorResponse('Missing, malformed, or expired token.'),
+            '404': errorResponse('No such post for this app and user.'),
+            '409': errorResponse('Every target had already begun dispatching or finished.'),
           },
         },
       },

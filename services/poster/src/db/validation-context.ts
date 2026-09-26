@@ -52,6 +52,7 @@ export function createValidationContextStore(sql: Sql): ValidationContextStore {
       const rows = await sql<
         {
           id: string;
+          status: 'pending_upload' | 'ready' | 'failed';
           kind: 'image' | 'video';
           mime_type: string;
           duration_ms: number | null;
@@ -59,7 +60,7 @@ export function createValidationContextStore(sql: Sql): ValidationContextStore {
           height: number | null;
         }[]
       >`
-        select id, kind, mime_type, duration_ms, width, height
+        select id, status, kind, mime_type, duration_ms, width, height
           from poster.media
          where user_id = ${userId}
            and id = any(${sql.array(uuids)}::uuid[])`;
@@ -71,6 +72,9 @@ export function createValidationContextStore(sql: Sql): ValidationContextStore {
             publicId,
             {
               media_id: publicId,
+              // Carried through so the validator can reject an unfinished upload
+              // rather than treating it as ready with unknown dimensions.
+              status: row.status,
               kind: row.kind,
               mime_type: row.mime_type,
               // The column is milliseconds; specs are in seconds.

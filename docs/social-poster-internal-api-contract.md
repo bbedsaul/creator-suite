@@ -1,6 +1,11 @@
-# Social Poster — Internal API Contract (v1.3)
+# Social Poster — Internal API Contract (v1.4)
 
-*Creator Suite · v1.3 2026-09-26 (v1.2 2026-09-26, v1.1 2026-09-26, v1 2026-09-19). Repo copy; this file is now the source of truth for implementation. The machine-readable form lives in `packages/poster-contract` (zod → OpenAPI, DECISIONS D-026), and the two must agree.*
+*Creator Suite · v1.4 2026-09-26 (v1.3, v1.2, v1.1 all 2026-09-26; v1 2026-09-19). Repo copy; this file is now the source of truth for implementation. The machine-readable form lives in `packages/poster-contract` (zod → OpenAPI, DECISIONS D-026), and the two must agree.*
+
+**v1.4 changes, all additive and non-breaking under §10:**
+- §5: `POST /v1/media` specified with both upload paths, plus `POST /v1/media/{id}/complete` (D-061).
+- §5.3: `GET /v1/posts/{id}`, `PATCH /v1/posts/{id}` and `POST /v1/posts/{id}/cancel` specified, including the mixed-state cancel rule (D-068).
+- §8: new constraint code `media_not_ready` for a referenced upload that has not finished.
 
 **v1.3 changes, all additive and non-breaking under §10:**
 - §5.1: `GET /v1/platforms/constraints` specified — the published limits, with provenance and a `provisional` flag (D-058).
@@ -117,8 +122,17 @@ GET /v1/users/{user_id}/connections
 One **logical post** fans out to one or more targets (connection + per-platform overrides), per PRD FR-05. Media is uploaded first, referenced by id.
 
 ```
-POST /v1/media   (or request a signed upload URL for large video)
-→ { "media_id": "md_001", "kind": "video", "duration_s": 58 }
+POST /v1/media                         (multipart/form-data: user_id + file)
+→ 201 { "media_id": "md_…", "status": "ready", "kind": "video",
+        "mime_type": "video/mp4", "duration_s": 58, "width": 1080, "height": 1920 }
+
+POST /v1/media                         (application/json, for large video)
+  { "user_id": "…", "kind": "video", "mime_type": "video/mp4", "size_bytes": 84000000 }
+→ 202 { "media_id": "md_…", "status": "pending_upload",
+        "upload_url": "https://…", "expires_at": "…" }
+  … PUT the bytes to upload_url …
+POST /v1/media/{media_id}/complete
+→ 200 { "media_id": "md_…", "status": "ready", "duration_s": 58, … }
 
 POST /v1/posts
 Idempotency-Key: trainer-lesson-42-clip-3
@@ -139,7 +153,9 @@ Idempotency-Key: trainer-lesson-42-clip-3
 - Constraint validation runs at submission (FR-06): any target failing platform rules rejects the whole request with per-target reasons (section 8). Nothing is partially accepted.
 - `external_ref` is the client's own id, echoed on every webhook — the Trainer maps events back to lessons without a lookup table.
 - Omitted `schedule_at` means dispatch immediately. `POST /v1/posts/{id}/cancel` works until dispatch begins (targets in `accepted`, `scheduled`, or `paused`); `PATCH` before dispatch re-validates constraints (FR-13).
-- Threads (FR-08): `content.thread` as an ordered array on platforms that support it; validation rejects it elsewhere.
+- Threads (FR-08): `content.thread` as an ordered array on platforms that support it; validation rejects it elsewhere. `content.media` and `content.thread` are mutually exclusive — media belongs to the part that carries it.
+- **Media must be `ready`** *(v1.4)*: `duration_s`, `width` and `height` are read from the file, never taken from the client, and a post referencing a `pending_upload` item is rejected with `media_not_ready`. A successful probe is not enough on its own — a file with no readable dimensions is refused at upload.
+- Omitting `schedule_at` sets each target's `due_at` to the moment of submission. Targets are created `scheduled`, not `accepted`: `accepted` is reserved for waiting on a per-platform rendition (D-016), and nothing requires one yet.
 
 ### 5.1 Platform constraints *(v1.3)*
 
@@ -178,6 +194,18 @@ POST /v1/posts/validate
 ```
 
 Runs exactly the validation `POST /v1/posts` runs and returns exactly the same 422, so a composer can show per-platform warnings before submitting instead of reimplementing the rules. Nothing is created and nothing is reserved. An unknown `connection_id` or media id is `404 not_found` rather than a validation failure — it is not a content problem, and the API does not confirm ids belonging to other users.
+
+### 5.3 Reading, editing and cancelling *(v1.4)*
+
+```
+GET   /v1/posts/{post_id}          → 200 the post, with per-target state and outcomes
+PATCH /v1/posts/{post_id}          → 200 updated, re-validated (FR-13)
+POST  /v1/posts/{post_id}/cancel   → 200 { canceled_target_ids: [ … ] }
+```
+
+- `PATCH` replaces the target list wholesale when `targets` is given, and re-runs the same validation as submission. It is refused with `409 too_late` once **any** target has begun dispatching, because the content may already be on its way.
+- `cancel` cancels every target that has not begun dispatching. When some targets are dispatching and others are not, the cancellable ones are cancelled and the response says which — a dispatching target genuinely cannot be recalled, and refusing the whole call would leave the others queued for no reason. `409 too_late` is returned only when **nothing** could be cancelled. Cancelling an already-cancelled post is `200` with an empty `canceled_target_ids`, so a retry is safe.
+- In app mode these are scoped to the calling app's own posts. In user mode they are scoped to the user, who sees every post made on their behalf whichever app created it.
 
 ## 6. Post lifecycle & states
 
@@ -270,7 +298,7 @@ Every envelope carries `request_id`, which is also returned in the `X-Request-Id
 | 429 | `rate_limited` | Per-app limit; honor `Retry-After` |
 | 500 | `internal_error` *(v1.2)* | Unexpected failure; the message is deliberately generic |
 
-Constraint codes (extensible; clients ignore unknown ones): `text_too_long`, `video_too_long`, `media_unsupported_format`, `aspect_ratio_invalid`, `thread_not_supported`, `too_many_media`, `media_required` *(v1.3)* — the platform cannot post without media, and `text_invalid_characters` *(v1.3)* — the text contains characters the platform refuses outright. One `details` entry is returned per violation, so a target that breaks two rules produces two entries with the same `target_index`. Runtime failures use `reason_class` on `post.failed` (extensible; clients handle unknown values as generic failure):
+Constraint codes (extensible; clients ignore unknown ones): `text_too_long`, `video_too_long`, `media_unsupported_format`, `aspect_ratio_invalid`, `thread_not_supported`, `too_many_media`, `media_required` *(v1.3)* — the platform cannot post without media, `text_invalid_characters` *(v1.3)* — the text contains characters the platform refuses outright, and `media_not_ready` *(v1.4)* — a referenced upload has not completed, so wait rather than change anything. One `details` entry is returned per violation, so a target that breaks two rules produces two entries with the same `target_index`. Runtime failures use `reason_class` on `post.failed` (extensible; clients handle unknown values as generic failure):
 
 | `reason_class` | Meaning | Client action |
 | --- | --- | --- |

@@ -95,10 +95,12 @@ jobs:
 
       # The Supabase CLI is a repo devDependency (D-031), so CI runs the same
       # version as a developer's machine. No setup-cli action on purpose.
+      # storage-api is included from S05 on: the media upload suite exercises real
+      # signed URLs, which a stub cannot prove anything about.
       - name: Start Supabase
         run: >
           pnpm exec supabase start
-          -x studio,realtime,storage-api,imgproxy,edge-runtime,logflare,vector,supavisor,mailpit,postgres-meta,postgrest
+          -x studio,realtime,imgproxy,edge-runtime,logflare,vector,supavisor,mailpit,postgres-meta,postgrest
 
       # Proves the migrations apply from zero, not just that they applied once.
       - name: Apply migrations from zero

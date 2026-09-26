@@ -70,6 +70,13 @@ export interface ApiConfig {
   readonly firstPartyClientId: string;
   readonly tokenEndpointLimitPerMin: number;
   readonly corsOrigins: readonly string[];
+  /** Supabase project URL, used for Storage only; the DB goes through postgres.js. */
+  readonly supabaseUrl: string;
+  readonly supabaseServiceRoleKey: string;
+  readonly mediaBucket: string;
+  /** Above this, a client must use the signed-URL path instead. */
+  readonly maxDirectUploadBytes: number;
+  readonly signedUrlTtlS: number;
 }
 
 export function loadApiConfig(): ApiConfig {
@@ -88,6 +95,11 @@ export function loadApiConfig(): ApiConfig {
     supabaseIssuer: requireEnv('SUPABASE_JWT_ISSUER'),
     firstPartyClientId: optionalEnv('FIRST_PARTY_CLIENT_ID', 'poster-web'),
     tokenEndpointLimitPerMin: intEnv('TOKEN_ENDPOINT_LIMIT_PER_MIN', 30),
+    supabaseUrl: requireEnv('SUPABASE_URL'),
+    supabaseServiceRoleKey: requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
+    mediaBucket: optionalEnv('MEDIA_BUCKET', 'poster-media'),
+    maxDirectUploadBytes: intEnv('MAX_DIRECT_UPLOAD_BYTES', 8 * 1024 * 1024),
+    signedUrlTtlS: intEnv('SIGNED_UPLOAD_TTL_S', 3600),
     corsOrigins: optionalEnv('CORS_ALLOWED_ORIGINS', '')
       .split(',')
       .map((origin) => origin.trim())

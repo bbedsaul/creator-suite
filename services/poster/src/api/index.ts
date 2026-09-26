@@ -14,6 +14,11 @@ import { loadApiConfig, loadConfig } from '../config.js';
 import { createClientAppStore } from '../db/client-apps.js';
 import { createPlatformConstraintStore } from '../db/platform-constraints.js';
 import { createValidationContextStore } from '../db/validation-context.js';
+import { createGrantStore } from '../db/grants.js';
+import { createMediaStore } from '../db/media.js';
+import { createPostStore } from '../db/posts.js';
+import { createFfprobeProber } from '../media/prober.js';
+import { createSupabaseStorage, ensureBucket } from '../media/storage.js';
 import { createPool } from '../db/pool.js';
 import { installShutdownHandlers } from '../shutdown.js';
 import { buildServer } from './server.js';
@@ -23,10 +28,26 @@ const apiConfig = loadApiConfig();
 
 const sql = createPool({ databaseUrl: apiConfig.databaseUrl });
 
+const storageOptions = {
+  url: apiConfig.supabaseUrl,
+  serviceRoleKey: apiConfig.supabaseServiceRoleKey,
+  bucket: apiConfig.mediaBucket,
+  signedUrlTtlS: apiConfig.signedUrlTtlS,
+};
+// Idempotent, and cheaper than making every deployment remember to do it.
+await ensureBucket(storageOptions);
+
 const app = buildServer(config, {
   apps: createClientAppStore(sql),
   constraints: createPlatformConstraintStore(sql),
   validationContext: createValidationContextStore(sql),
+  grants: createGrantStore(sql),
+  mediaStore: createMediaStore(sql),
+  postStore: createPostStore(sql),
+  storage: createSupabaseStorage(storageOptions),
+  prober: createFfprobeProber(),
+  maxDirectUploadBytes: apiConfig.maxDirectUploadBytes,
+  signedUrlTtlS: apiConfig.signedUrlTtlS,
   appTokens: createAppTokenSigner({
     secret: apiConfig.appTokenSecret,
     keyId: apiConfig.appTokenKeyId,

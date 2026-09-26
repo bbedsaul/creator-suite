@@ -5,8 +5,8 @@ import { AuthContext, TokenRequest, TokenResponse } from '../src/auth.js';
 import { buildOpenApiDocument } from '../src/openapi.js';
 
 describe('contract version', () => {
-  it('is 1.3, matching the repo doc (D-027, bumped in S04 for D-056/D-057/D-058)', () => {
-    expect(CONTRACT_VERSION).toBe('1.3');
+  it('is 1.4, matching the repo doc (D-027, bumped in S05 for the media and post routes)', () => {
+    expect(CONTRACT_VERSION).toBe('1.4');
   });
 });
 
@@ -118,9 +118,14 @@ describe('generated OpenAPI document', () => {
   it('describes the routes that exist and no others', () => {
     expect(Object.keys(doc.paths).sort()).toEqual([
       '/v1/auth/context',
+      '/v1/media',
+      '/v1/media/{media_id}/complete',
       '/v1/oauth/token',
       '/v1/platforms/constraints',
+      '/v1/posts',
       '/v1/posts/validate',
+      '/v1/posts/{post_id}',
+      '/v1/posts/{post_id}/cancel',
     ]);
   });
 

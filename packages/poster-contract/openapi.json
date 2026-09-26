@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Social Poster internal API",
-    "version": "1.3",
+    "version": "1.4",
     "description": "Cross-platform publishing API. Two auth modes share every /v1 route (D-023): app mode uses a client-credentials JWT, user mode uses the signed-in user’s Supabase session JWT and acts as the first-party poster-web app."
   },
   "servers": [
@@ -439,6 +439,643 @@
         "additionalProperties": false,
         "description": "Returned only when every target passes. Failures use the §8 422 envelope."
       },
+      "Media": {
+        "type": "object",
+        "properties": {
+          "media_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending_upload", "ready", "failed"],
+            "description": "pending_upload until the bytes arrive and are probed."
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["image", "video"]
+          },
+          "mime_type": {
+            "type": "string"
+          },
+          "size_bytes": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "duration_s": {
+            "nullable": true,
+            "type": "number"
+          },
+          "width": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991
+          },
+          "height": {
+            "nullable": true,
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991
+          },
+          "created_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "media_id",
+          "status",
+          "kind",
+          "mime_type",
+          "size_bytes",
+          "duration_s",
+          "width",
+          "height",
+          "created_at"
+        ],
+        "additionalProperties": false,
+        "description": "A stored media item."
+      },
+      "SignedUploadRequest": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["image", "video"]
+          },
+          "mime_type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "maximum": 9007199254740991,
+            "description": "Declared size, used to reject uploads the plan does not allow."
+          },
+          "filename": {
+            "description": "Only used to pick a storage extension.",
+            "type": "string"
+          }
+        },
+        "required": ["user_id", "kind", "mime_type", "size_bytes"],
+        "additionalProperties": false,
+        "description": "Ask for a signed URL instead of sending the bytes through the API."
+      },
+      "SignedUploadResponse": {
+        "type": "object",
+        "properties": {
+          "media_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending_upload"]
+          },
+          "upload_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "PUT the bytes here, then call /complete."
+          },
+          "expires_at": {
+            "type": "string"
+          }
+        },
+        "required": ["media_id", "status", "upload_url", "expires_at"],
+        "additionalProperties": false,
+        "description": "A one-shot upload target. Nothing is usable until /complete succeeds."
+      },
+      "SubmitPostRequest": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "external_ref": {
+            "description": "The client’s own id, echoed on every webhook for this post.",
+            "type": "string",
+            "maxLength": 255
+          },
+          "content": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "description": "Default caption for every target.",
+                "type": "string"
+              },
+              "title": {
+                "description": "Default title, for platforms that have one.",
+                "type": "string"
+              },
+              "media": {
+                "description": "Public media ids, in order.",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "thread": {
+                "description": "Ordered multi-part post (FR-08). Rejected on platforms without threads.",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    },
+                    "media": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": ["text"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false,
+            "description": "What to post, before per-target overrides."
+          },
+          "targets": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "connection_id": {
+                  "type": "string",
+                  "description": "Public connection id, e.g. cn_…"
+                },
+                "overrides": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Per-platform replacements for the default content."
+                }
+              },
+              "required": ["connection_id"],
+              "additionalProperties": false,
+              "description": "One target: which account, and what to change for it."
+            }
+          },
+          "schedule_at": {
+            "description": "ISO 8601 UTC. Omitted means dispatch as soon as the post is ready.",
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": ["user_id", "content", "targets"],
+        "additionalProperties": false,
+        "description": "A post to publish to one or more connected accounts."
+      },
+      "Post": {
+        "type": "object",
+        "properties": {
+          "post_id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "scheduled",
+              "dispatching",
+              "posted",
+              "failed",
+              "paused",
+              "canceled",
+              "partial"
+            ],
+            "description": "Derived from the targets: posted when all posted, partial when mixed."
+          },
+          "external_ref": {
+            "nullable": true,
+            "type": "string"
+          },
+          "schedule_at": {
+            "nullable": true,
+            "type": "string"
+          },
+          "content": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "description": "Default caption for every target.",
+                "type": "string"
+              },
+              "title": {
+                "description": "Default title, for platforms that have one.",
+                "type": "string"
+              },
+              "media": {
+                "description": "Public media ids, in order.",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "thread": {
+                "description": "Ordered multi-part post (FR-08). Rejected on platforms without threads.",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    },
+                    "media": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": ["text"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false,
+            "description": "What to post, before per-target overrides."
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "target_id": {
+                  "type": "string"
+                },
+                "connection_id": {
+                  "type": "string"
+                },
+                "platform_id": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "accepted",
+                    "scheduled",
+                    "dispatching",
+                    "posted",
+                    "failed",
+                    "paused",
+                    "canceled"
+                  ],
+                  "description": "Per-target state (§6). State lives per target, never per post."
+                },
+                "due_at": {
+                  "type": "string"
+                },
+                "position": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "Matches target_index in §8 details."
+                }
+              },
+              "required": [
+                "target_id",
+                "connection_id",
+                "platform_id",
+                "state",
+                "due_at",
+                "position"
+              ],
+              "additionalProperties": false,
+              "description": "One created target."
+            }
+          }
+        },
+        "required": [
+          "post_id",
+          "state",
+          "external_ref",
+          "schedule_at",
+          "content",
+          "created_at",
+          "targets"
+        ],
+        "additionalProperties": false,
+        "description": "A logical post and its targets."
+      },
+      "PostDetail": {
+        "type": "object",
+        "properties": {
+          "post_id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "scheduled",
+              "dispatching",
+              "posted",
+              "failed",
+              "paused",
+              "canceled",
+              "partial"
+            ],
+            "description": "Derived from the targets: posted when all posted, partial when mixed."
+          },
+          "external_ref": {
+            "nullable": true,
+            "type": "string"
+          },
+          "schedule_at": {
+            "nullable": true,
+            "type": "string"
+          },
+          "content": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "description": "Default caption for every target.",
+                "type": "string"
+              },
+              "title": {
+                "description": "Default title, for platforms that have one.",
+                "type": "string"
+              },
+              "media": {
+                "description": "Public media ids, in order.",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "thread": {
+                "description": "Ordered multi-part post (FR-08). Rejected on platforms without threads.",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    },
+                    "media": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": ["text"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false,
+            "description": "What to post, before per-target overrides."
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "target_id": {
+                  "type": "string"
+                },
+                "connection_id": {
+                  "type": "string"
+                },
+                "platform_id": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "accepted",
+                    "scheduled",
+                    "dispatching",
+                    "posted",
+                    "failed",
+                    "paused",
+                    "canceled"
+                  ],
+                  "description": "Per-target state (§6). State lives per target, never per post."
+                },
+                "due_at": {
+                  "type": "string"
+                },
+                "position": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "Matches target_index in §8 details."
+                },
+                "permalink": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "platform_post_id": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "reason_class": {
+                  "nullable": true,
+                  "type": "string",
+                  "enum": [
+                    "transient_exhausted",
+                    "platform_rejected",
+                    "token_revoked_expired",
+                    "grant_revoked",
+                    "rendition_failed",
+                    "dispatch_outcome_unknown"
+                  ]
+                },
+                "platform_message": {
+                  "nullable": true,
+                  "type": "string"
+                },
+                "attempt_count": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "posted_at": {
+                  "nullable": true,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "target_id",
+                "connection_id",
+                "platform_id",
+                "state",
+                "due_at",
+                "position",
+                "permalink",
+                "platform_post_id",
+                "reason_class",
+                "platform_message",
+                "attempt_count",
+                "posted_at"
+              ],
+              "additionalProperties": false,
+              "description": "Everything known about one target, including how it ended."
+            }
+          }
+        },
+        "required": [
+          "post_id",
+          "state",
+          "external_ref",
+          "schedule_at",
+          "content",
+          "created_at",
+          "targets"
+        ],
+        "additionalProperties": false,
+        "description": "GET /v1/posts/{id}."
+      },
+      "PatchPostRequest": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "description": "Default caption for every target.",
+                "type": "string"
+              },
+              "title": {
+                "description": "Default title, for platforms that have one.",
+                "type": "string"
+              },
+              "media": {
+                "description": "Public media ids, in order.",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "thread": {
+                "description": "Ordered multi-part post (FR-08). Rejected on platforms without threads.",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    },
+                    "media": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": ["text"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false,
+            "description": "What to post, before per-target overrides."
+          },
+          "targets": {
+            "description": "Replaces the target list wholesale. Omit to leave targets alone.",
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "connection_id": {
+                  "type": "string",
+                  "description": "Public connection id, e.g. cn_…"
+                },
+                "overrides": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "description": "Per-platform replacements for the default content."
+                }
+              },
+              "required": ["connection_id"],
+              "additionalProperties": false,
+              "description": "One target: which account, and what to change for it."
+            }
+          },
+          "schedule_at": {
+            "description": "null clears the schedule.",
+            "nullable": true,
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "additionalProperties": false,
+        "description": "An edit before dispatch. Re-validates constraints (FR-13)."
+      },
+      "CancelPostResponse": {
+        "type": "object",
+        "properties": {
+          "post_id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "scheduled",
+              "dispatching",
+              "posted",
+              "failed",
+              "paused",
+              "canceled",
+              "partial"
+            ],
+            "description": "Derived from the targets: posted when all posted, partial when mixed."
+          },
+          "canceled_target_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Targets this call moved to canceled. Empty when it was already canceled."
+          }
+        },
+        "required": ["post_id", "state", "canceled_target_ids"],
+        "additionalProperties": false,
+        "description": "The outcome of a cancel."
+      },
       "ErrorEnvelope": {
         "type": "object",
         "properties": {
@@ -768,6 +1405,511 @@
           },
           "429": {
             "description": "Per-app rate limit exceeded; honor Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/media": {
+      "post": {
+        "operationId": "createMedia",
+        "summary": "Upload media, or get a signed URL to upload it directly",
+        "description": "Two paths, chosen by Content-Type. `multipart/form-data` sends the bytes through the API, which stores and probes them and returns a ready media row; it is capped in size. `application/json` returns a signed upload URL instead, for large video that should not pass through the API process — PUT the bytes to that URL and then call /complete. Media is uploaded once and referenced by id from any number of posts (FR-07).",
+        "tags": ["media"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["user_id", "file"],
+                "properties": {
+                  "user_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignedUploadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Stored and probed (multipart path).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Media"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Signed URL issued; nothing is usable until /complete.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignedUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request, unsupported type, or file too large.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or expired token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "User-mode token does not match the requested user_id.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Per-app rate limit exceeded; honor Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/media/{media_id}/complete": {
+      "post": {
+        "operationId": "completeMedia",
+        "summary": "Finish a signed-URL upload",
+        "description": "Probes the uploaded object for duration and dimensions and marks the media ready. Until this succeeds the media cannot be posted, and referencing it yields the `media_not_ready` constraint code.",
+        "tags": ["media"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "media_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Probed and ready.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Media"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The object is missing or could not be probed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or expired token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such media for this user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/posts": {
+      "post": {
+        "operationId": "submitPost",
+        "summary": "Submit a post to one or more connected accounts",
+        "description": "Validates every target and creates all of them or none (§5). Send an `Idempotency-Key` header: the same key with the same body returns the original result, and the same key with a different body is 409 `idempotency_conflict`. Keys are scoped per app and kept at least 24 hours. Omitting `schedule_at` means dispatch as soon as the post is ready.",
+        "tags": ["posts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "description": "Strongly recommended. Without it a retry creates a second post."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitPostRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted; targets created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or expired token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "forbidden_user, or grant_missing for a connection.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "A connection or media id does not exist for this user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Same Idempotency-Key with a different body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "One or more targets failed platform rules; see details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Per-app rate limit exceeded; honor Retry-After.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/posts/{post_id}": {
+      "get": {
+        "operationId": "getPost",
+        "summary": "Read a post and its targets",
+        "tags": ["posts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "post_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The post, with per-target state and outcomes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or expired token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such post for this app and user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "patchPost",
+        "summary": "Edit a post before dispatch",
+        "description": "Re-validates constraints (FR-13). Refused with 409 `too_late` once any target has begun dispatching, because the content may already be on its way.",
+        "tags": ["posts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "post_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchPostRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated and re-validated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or expired token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "forbidden_user, or grant_missing for a connection.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such post, connection, or media for this user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A target is already dispatching.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The edit fails platform rules; see details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/posts/{post_id}/cancel": {
+      "post": {
+        "operationId": "cancelPost",
+        "summary": "Cancel a post before dispatch",
+        "description": "Cancels every target that has not begun dispatching (§6). Returns 409 `too_late` when nothing could be canceled. A post already canceled returns 200 with an empty `canceled_target_ids`, so a retry is safe.",
+        "tags": ["posts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "post_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancel applied, or already canceled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancelPostResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, malformed, or expired token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such post for this app and user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Every target had already begun dispatching or finished.",
             "content": {
               "application/json": {
                 "schema": {

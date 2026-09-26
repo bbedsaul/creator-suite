@@ -458,21 +458,49 @@ describe('error envelope and request ids (contract §8, D-044)', () => {
 
   it('404s a malformed public id instead of failing with a 500', async () => {
     server = await buildTestServer();
-    // Routes that take a public id arrive in S05; until then any id path is
-    // unmatched, and the point of this assertion is that a hostile id shape
-    // produces a clean 404 envelope rather than a stack trace.
+    const headers = { authorization: `Bearer ${await mintAppToken()}` };
+
+    // Now that GET /v1/posts/{id} exists this is the real path: the id is
+    // decoded, fails to decode, and becomes a 404 rather than a stack trace.
+    // Authentication comes first, so these are sent authenticated.
     for (const id of [
       'po_NOTVALID',
-      "po_'; drop table poster.posts; --",
-      'po_' + 'A'.repeat(300),
+      "po_';drop table poster.posts;--",
+      `po_${'A'.repeat(100)}`,
+      'not-even-prefixed',
     ]) {
       const response = await server.app.inject({
         method: 'GET',
-        url: `/v1/posts/${encodeURIComponent(id)}`,
+        url: `/v1/posts/${encodeURIComponent(id)}?user_id=${USER_A}`,
+        headers,
       });
       expect(response.statusCode, `id ${id}`).toBe(404);
       expectEnvelope(response.body, 'not_found');
     }
+  });
+
+  it('answers a pathologically long id with a 4xx, never a 5xx', async () => {
+    server = await buildTestServer();
+    const response = await server.app.inject({
+      method: 'GET',
+      url: `/v1/posts/po_${'A'.repeat(5000)}`,
+      headers: { authorization: `Bearer ${await mintAppToken()}` },
+    });
+
+    // 414 from the HTTP layer is a fine answer; what matters is that a hostile
+    // URL never reaches the handler as a server fault.
+    expect(response.statusCode).toBeGreaterThanOrEqual(400);
+    expect(response.statusCode).toBeLessThan(500);
+  });
+
+  it('401s before looking anything up, so an unauthenticated probe learns nothing', async () => {
+    server = await buildTestServer();
+    const response = await server.app.inject({
+      method: 'GET',
+      url: '/v1/posts/po_NOTVALID',
+    });
+    // Not 404: whether an id exists is not information an anonymous caller gets.
+    expect(response.statusCode).toBe(401);
   });
 
   it('puts a request id on every response header', async () => {

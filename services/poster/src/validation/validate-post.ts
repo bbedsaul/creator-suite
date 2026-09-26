@@ -96,7 +96,7 @@ export function validatePost(
     const thread = request.content.thread;
 
     const input: { -readonly [K in keyof TargetValidationInput]: TargetValidationInput[K] } = {
-      media: mediaFor(request.content.media, deps.media),
+      media: mediaFor(mediaIdsIn(request.content), deps.media),
     };
     if (text !== undefined) input.text = text;
     if (title !== undefined) input.title = title;

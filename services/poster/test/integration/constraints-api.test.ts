@@ -26,6 +26,10 @@ import { loadConfig } from '../../src/config.js';
 import { createClientAppStore } from '../../src/db/client-apps.js';
 import { createPlatformConstraintStore } from '../../src/db/platform-constraints.js';
 import { createValidationContextStore } from '../../src/db/validation-context.js';
+import { createGrantStore } from '../../src/db/grants.js';
+import { createMediaStore } from '../../src/db/media.js';
+import { createPostStore } from '../../src/db/posts.js';
+import { createStubProber, createStubStorage } from '../helpers/build-test-server.js';
 import { loadConstraints, readSpecs, specDirectory } from '../../src/seed-constraints.js';
 import { TEST_CLIENT_ID, TEST_CLIENT_SECRET, seed } from '../../src/seed.js';
 
@@ -98,6 +102,14 @@ beforeAll(async () => {
       apps: createClientAppStore(sql),
       constraints: createPlatformConstraintStore(sql),
       validationContext: createValidationContextStore(sql),
+      grants: createGrantStore(sql),
+      mediaStore: createMediaStore(sql),
+      postStore: createPostStore(sql),
+      // These suites cover auth and constraints; posts and media have their own.
+      storage: createStubStorage(),
+      prober: createStubProber(),
+      maxDirectUploadBytes: 8 * 1024 * 1024,
+      signedUrlTtlS: 3600,
       appTokens: createAppTokenSigner({
         secret: APP_TOKEN_SECRET,
         keyId: 'k1',

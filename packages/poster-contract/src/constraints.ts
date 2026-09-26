@@ -50,6 +50,16 @@ export const MEDIA_KINDS = ['image', 'video'] as const;
 export const MediaKind = z.enum(MEDIA_KINDS);
 export type MediaKind = z.infer<typeof MediaKind>;
 
+/**
+ * Upload lifecycle. Declared here rather than in media.ts because the validator
+ * needs it, and the other direction would make the two modules circular.
+ */
+export const MEDIA_STATUSES = ['pending_upload', 'ready', 'failed'] as const;
+export const MediaStatus = z
+  .enum(MEDIA_STATUSES)
+  .describe('pending_upload until the bytes arrive and are probed.');
+export type MediaStatus = z.infer<typeof MediaStatus>;
+
 export const MediaConstraint = z
   .object({
     kinds: z.array(MediaKind).describe('Media kinds this platform accepts at all.'),
@@ -155,6 +165,7 @@ export type PlatformConstraintsResponse = z.infer<typeof PlatformConstraintsResp
 export const MediaFacts = z
   .object({
     media_id: z.string(),
+    status: MediaStatus,
     kind: MediaKind,
     mime_type: z.string(),
     duration_s: z.number().nullable(),
@@ -183,8 +194,10 @@ export type TargetValidationInput = z.infer<typeof TargetValidationInput>;
  * Constraint codes. The first six are contract §8. Two are additive (D-056),
  * both because reporting them under an existing code would misinform a client
  * switching on `code`: `media_required` for a platform that cannot post text
- * alone, and `text_invalid_characters` for characters a platform rejects outright
- * (YouTube refuses < and > in titles and descriptions).
+ * alone, `text_invalid_characters` for characters a platform rejects outright
+ * (YouTube refuses < and > in titles and descriptions), and `media_not_ready` for
+ * a referenced upload that has not finished (D-061) — the client's action there is
+ * to wait, which is nothing like fixing content.
  */
 export const CONSTRAINT_VIOLATION_CODES = [
   'text_too_long',
@@ -195,6 +208,7 @@ export const CONSTRAINT_VIOLATION_CODES = [
   'too_many_media',
   'media_required',
   'text_invalid_characters',
+  'media_not_ready',
 ] as const;
 
 export const ConstraintViolationCode = z.enum(CONSTRAINT_VIOLATION_CODES);
@@ -296,8 +310,19 @@ export function validateTarget(
     });
   }
 
-  // --- per-item kind, format, duration, aspect ratio ---------------------
+  // --- per-item readiness, kind, format, duration, aspect ratio ---------
   for (const item of input.media) {
+    if (item.status !== 'ready') {
+      // Its dimensions and duration are unknown until the upload completes, so
+      // there is nothing else worth saying about this item.
+      violations.push({
+        code: 'media_not_ready',
+        constraint: { status: item.status },
+        media_id: item.media_id,
+      });
+      continue;
+    }
+
     if (!spec.media.kinds.includes(item.kind)) {
       violations.push({
         code: 'media_unsupported_format',

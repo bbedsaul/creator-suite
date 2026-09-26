@@ -41,7 +41,17 @@ const PLATFORM_NAME_ALLOWED = [
  * Specific waivers: { file, line substring, reason }. A waiver must name the
  * exact text it excuses, so it cannot silently cover a later addition.
  */
-const ALLOWLIST = [];
+const ALLOWLIST = [
+  {
+    file: 'packages/poster-contract/src/openapi.ts',
+    line: 'maxLength: 255',
+    reason:
+      'Our own Idempotency-Key length cap, documented in the spec and mirroring the ' +
+      'length(key) between 1 and 255 check on poster.idempotency_keys. It is an API ' +
+      'limit we set, not a platform rule we are told, so it does not belong in a ' +
+      'constraint spec.',
+  },
+];
 
 const LIMIT_NAME = String.raw`(?:max|min)_?(?:length|duration(?:_s|_ms)?|count|size|bytes|width|height|parts|attempts)|aspect_ratio|max_video_post_duration_sec`;
 

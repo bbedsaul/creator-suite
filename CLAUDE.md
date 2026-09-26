@@ -98,6 +98,7 @@ pnpm -F @suite/poster-service seed -- --rotate   # issue new secrets (default pr
 pnpm gen:check                                   # committed spec + client match the schemas
 pnpm gen:types:check                             # committed DB types match the migrations
 pnpm -F @suite/poster-service seed:constraints   # load platform specs -> DB, enables them (D-058)
+pnpm -F @suite/poster-service seed:grants -- --user <uuid> [--app trainer-dev]   # dev grants (D-067)
 pnpm lint:limits                                 # no platform limit hard-coded in TS (rule 9)
 pnpm lint:limits:verify                          # proves lint:limits rejects real violations
 pnpm -F @suite/poster-service dev:api      # backend alone — no frontend needed

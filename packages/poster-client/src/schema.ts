@@ -93,6 +93,107 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/v1/media': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Upload media, or get a signed URL to upload it directly
+     * @description Two paths, chosen by Content-Type. `multipart/form-data` sends the bytes through the API, which stores and probes them and returns a ready media row; it is capped in size. `application/json` returns a signed upload URL instead, for large video that should not pass through the API process — PUT the bytes to that URL and then call /complete. Media is uploaded once and referenced by id from any number of posts (FR-07).
+     */
+    post: operations['createMedia'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/media/{media_id}/complete': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Finish a signed-URL upload
+     * @description Probes the uploaded object for duration and dimensions and marks the media ready. Until this succeeds the media cannot be posted, and referencing it yields the `media_not_ready` constraint code.
+     */
+    post: operations['completeMedia'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/posts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Submit a post to one or more connected accounts
+     * @description Validates every target and creates all of them or none (§5). Send an `Idempotency-Key` header: the same key with the same body returns the original result, and the same key with a different body is 409 `idempotency_conflict`. Keys are scoped per app and kept at least 24 hours. Omitting `schedule_at` means dispatch as soon as the post is ready.
+     */
+    post: operations['submitPost'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/posts/{post_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Read a post and its targets */
+    get: operations['getPost'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Edit a post before dispatch
+     * @description Re-validates constraints (FR-13). Refused with 409 `too_late` once any target has begun dispatching, because the content may already be on its way.
+     */
+    patch: operations['patchPost'];
+    trace?: never;
+  };
+  '/v1/posts/{post_id}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Cancel a post before dispatch
+     * @description Cancels every target that has not begun dispatching (§6). Returns 409 `too_late` when nothing could be canceled. A post already canceled returns 200 with an empty `canceled_target_ids`, so a retry is safe.
+     */
+    post: operations['cancelPost'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -246,6 +347,243 @@ export interface components {
         platform_id: string;
       }[];
     };
+    /** @description A stored media item. */
+    Media: {
+      media_id: string;
+      /**
+       * @description pending_upload until the bytes arrive and are probed.
+       * @enum {string}
+       */
+      status: 'pending_upload' | 'ready' | 'failed';
+      /** @enum {string} */
+      kind: 'image' | 'video';
+      mime_type: string;
+      size_bytes: number | null;
+      duration_s: number | null;
+      width: number | null;
+      height: number | null;
+      created_at: string;
+    };
+    /** @description Ask for a signed URL instead of sending the bytes through the API. */
+    SignedUploadRequest: {
+      /** Format: uuid */
+      user_id: string;
+      /** @enum {string} */
+      kind: 'image' | 'video';
+      mime_type: string;
+      /** @description Declared size, used to reject uploads the plan does not allow. */
+      size_bytes: number;
+      /** @description Only used to pick a storage extension. */
+      filename?: string;
+    };
+    /** @description A one-shot upload target. Nothing is usable until /complete succeeds. */
+    SignedUploadResponse: {
+      media_id: string;
+      /** @enum {string} */
+      status: 'pending_upload';
+      /**
+       * Format: uri
+       * @description PUT the bytes here, then call /complete.
+       */
+      upload_url: string;
+      expires_at: string;
+    };
+    /** @description A post to publish to one or more connected accounts. */
+    SubmitPostRequest: {
+      /** Format: uuid */
+      user_id: string;
+      /** @description The client’s own id, echoed on every webhook for this post. */
+      external_ref?: string;
+      /** @description What to post, before per-target overrides. */
+      content: {
+        /** @description Default caption for every target. */
+        text?: string;
+        /** @description Default title, for platforms that have one. */
+        title?: string;
+        /** @description Public media ids, in order. */
+        media?: string[];
+        /** @description Ordered multi-part post (FR-08). Rejected on platforms without threads. */
+        thread?: {
+          text: string;
+          media?: string[];
+        }[];
+      };
+      targets: {
+        /** @description Public connection id, e.g. cn_… */
+        connection_id: string;
+        /** @description Per-platform replacements for the default content. */
+        overrides?: {
+          text?: string;
+          title?: string;
+        };
+      }[];
+      /**
+       * Format: date-time
+       * @description ISO 8601 UTC. Omitted means dispatch as soon as the post is ready.
+       */
+      schedule_at?: string;
+    };
+    /** @description A logical post and its targets. */
+    Post: {
+      post_id: string;
+      /**
+       * @description Derived from the targets: posted when all posted, partial when mixed.
+       * @enum {string}
+       */
+      state:
+        | 'accepted'
+        | 'scheduled'
+        | 'dispatching'
+        | 'posted'
+        | 'failed'
+        | 'paused'
+        | 'canceled'
+        | 'partial';
+      external_ref: string | null;
+      schedule_at: string | null;
+      /** @description What to post, before per-target overrides. */
+      content: {
+        /** @description Default caption for every target. */
+        text?: string;
+        /** @description Default title, for platforms that have one. */
+        title?: string;
+        /** @description Public media ids, in order. */
+        media?: string[];
+        /** @description Ordered multi-part post (FR-08). Rejected on platforms without threads. */
+        thread?: {
+          text: string;
+          media?: string[];
+        }[];
+      };
+      created_at: string;
+      targets: {
+        target_id: string;
+        connection_id: string;
+        platform_id: string;
+        /**
+         * @description Per-target state (§6). State lives per target, never per post.
+         * @enum {string}
+         */
+        state:
+          'accepted' | 'scheduled' | 'dispatching' | 'posted' | 'failed' | 'paused' | 'canceled';
+        due_at: string;
+        /** @description Matches target_index in §8 details. */
+        position: number;
+      }[];
+    };
+    /** @description GET /v1/posts/{id}. */
+    PostDetail: {
+      post_id: string;
+      /**
+       * @description Derived from the targets: posted when all posted, partial when mixed.
+       * @enum {string}
+       */
+      state:
+        | 'accepted'
+        | 'scheduled'
+        | 'dispatching'
+        | 'posted'
+        | 'failed'
+        | 'paused'
+        | 'canceled'
+        | 'partial';
+      external_ref: string | null;
+      schedule_at: string | null;
+      /** @description What to post, before per-target overrides. */
+      content: {
+        /** @description Default caption for every target. */
+        text?: string;
+        /** @description Default title, for platforms that have one. */
+        title?: string;
+        /** @description Public media ids, in order. */
+        media?: string[];
+        /** @description Ordered multi-part post (FR-08). Rejected on platforms without threads. */
+        thread?: {
+          text: string;
+          media?: string[];
+        }[];
+      };
+      created_at: string;
+      targets: {
+        target_id: string;
+        connection_id: string;
+        platform_id: string;
+        /**
+         * @description Per-target state (§6). State lives per target, never per post.
+         * @enum {string}
+         */
+        state:
+          'accepted' | 'scheduled' | 'dispatching' | 'posted' | 'failed' | 'paused' | 'canceled';
+        due_at: string;
+        /** @description Matches target_index in §8 details. */
+        position: number;
+        permalink: string | null;
+        platform_post_id: string | null;
+        /** @enum {string|null} */
+        reason_class:
+          | 'transient_exhausted'
+          | 'platform_rejected'
+          | 'token_revoked_expired'
+          | 'grant_revoked'
+          | 'rendition_failed'
+          | 'dispatch_outcome_unknown'
+          | null;
+        platform_message: string | null;
+        attempt_count: number;
+        posted_at: string | null;
+      }[];
+    };
+    /** @description An edit before dispatch. Re-validates constraints (FR-13). */
+    PatchPostRequest: {
+      /** @description What to post, before per-target overrides. */
+      content?: {
+        /** @description Default caption for every target. */
+        text?: string;
+        /** @description Default title, for platforms that have one. */
+        title?: string;
+        /** @description Public media ids, in order. */
+        media?: string[];
+        /** @description Ordered multi-part post (FR-08). Rejected on platforms without threads. */
+        thread?: {
+          text: string;
+          media?: string[];
+        }[];
+      };
+      /** @description Replaces the target list wholesale. Omit to leave targets alone. */
+      targets?: {
+        /** @description Public connection id, e.g. cn_… */
+        connection_id: string;
+        /** @description Per-platform replacements for the default content. */
+        overrides?: {
+          text?: string;
+          title?: string;
+        };
+      }[];
+      /**
+       * Format: date-time
+       * @description null clears the schedule.
+       */
+      schedule_at?: string | null;
+    };
+    /** @description The outcome of a cancel. */
+    CancelPostResponse: {
+      post_id: string;
+      /**
+       * @description Derived from the targets: posted when all posted, partial when mixed.
+       * @enum {string}
+       */
+      state:
+        | 'accepted'
+        | 'scheduled'
+        | 'dispatching'
+        | 'posted'
+        | 'failed'
+        | 'paused'
+        | 'canceled'
+        | 'partial';
+      /** @description Targets this call moved to canceled. Empty when it was already canceled. */
+      canceled_target_ids: string[];
+    };
     /** @description The single error envelope used by every non-2xx response. */
     ErrorEnvelope: {
       error: {
@@ -296,6 +634,14 @@ export type SchemaPlatformConstraintsResponse =
   components['schemas']['PlatformConstraintsResponse'];
 export type SchemaValidatePostRequest = components['schemas']['ValidatePostRequest'];
 export type SchemaValidatePostResponse = components['schemas']['ValidatePostResponse'];
+export type SchemaMedia = components['schemas']['Media'];
+export type SchemaSignedUploadRequest = components['schemas']['SignedUploadRequest'];
+export type SchemaSignedUploadResponse = components['schemas']['SignedUploadResponse'];
+export type SchemaSubmitPostRequest = components['schemas']['SubmitPostRequest'];
+export type SchemaPost = components['schemas']['Post'];
+export type SchemaPostDetail = components['schemas']['PostDetail'];
+export type SchemaPatchPostRequest = components['schemas']['PatchPostRequest'];
+export type SchemaCancelPostResponse = components['schemas']['CancelPostResponse'];
 export type SchemaErrorEnvelope = components['schemas']['ErrorEnvelope'];
 export type $defs = Record<string, never>;
 export interface operations {
@@ -507,6 +853,389 @@ export interface operations {
       };
       /** @description Per-app rate limit exceeded; honor Retry-After. */
       429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+    };
+  };
+  createMedia: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'multipart/form-data': {
+          /** Format: uuid */
+          user_id: string;
+          /** Format: binary */
+          file: string;
+        };
+        'application/json': components['schemas']['SignedUploadRequest'];
+      };
+    };
+    responses: {
+      /** @description Stored and probed (multipart path). */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Media'];
+        };
+      };
+      /** @description Signed URL issued; nothing is usable until /complete. */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SignedUploadResponse'];
+        };
+      };
+      /** @description Malformed request, unsupported type, or file too large. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description Missing, malformed, or expired token. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description User-mode token does not match the requested user_id. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description Per-app rate limit exceeded; honor Retry-After. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+    };
+  };
+  completeMedia: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        media_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Probed and ready. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Media'];
+        };
+      };
+      /** @description The object is missing or could not be probed. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description Missing, malformed, or expired token. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description No such media for this user. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+    };
+  };
+  submitPost: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Strongly recommended. Without it a retry creates a second post. */
+        'Idempotency-Key'?: string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SubmitPostRequest'];
+      };
+    };
+    responses: {
+      /** @description Accepted; targets created. */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Post'];
+        };
+      };
+      /** @description Malformed request body. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description Missing, malformed, or expired token. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description forbidden_user, or grant_missing for a connection. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description A connection or media id does not exist for this user. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description Same Idempotency-Key with a different body. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description One or more targets failed platform rules; see details. */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description Per-app rate limit exceeded; honor Retry-After. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+    };
+  };
+  getPost: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        post_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The post, with per-target state and outcomes. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PostDetail'];
+        };
+      };
+      /** @description Missing, malformed, or expired token. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description No such post for this app and user. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+    };
+  };
+  patchPost: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        post_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PatchPostRequest'];
+      };
+    };
+    responses: {
+      /** @description Updated and re-validated. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PostDetail'];
+        };
+      };
+      /** @description Malformed request body. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description Missing, malformed, or expired token. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description forbidden_user, or grant_missing for a connection. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description No such post, connection, or media for this user. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description A target is already dispatching. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description The edit fails platform rules; see details. */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+    };
+  };
+  cancelPost: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        post_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Cancel applied, or already canceled. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CancelPostResponse'];
+        };
+      };
+      /** @description Missing, malformed, or expired token. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description No such post for this app and user. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorEnvelope'];
+        };
+      };
+      /** @description Every target had already begun dispatching or finished. */
+      409: {
         headers: {
           [name: string]: unknown;
         };

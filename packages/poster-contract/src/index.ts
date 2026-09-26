@@ -64,4 +64,29 @@ export {
   type Violation,
 } from './constraints.js';
 
+export {
+  MEDIA_STATUSES,
+  MediaStatus,
+  Media,
+  SignedUploadRequest,
+  SignedUploadResponse,
+} from './media.js';
+
+export {
+  TARGET_STATES,
+  POST_STATES,
+  REASON_CLASSES,
+  TargetState,
+  PostState,
+  ReasonClass,
+  SubmitTarget,
+  SubmitPostRequest,
+  PostTargetSummary,
+  PostTargetDetail,
+  Post,
+  PostDetail,
+  PatchPostRequest,
+  CancelPostResponse,
+} from './posts.js';
+
 export { buildOpenApiDocument } from './openapi.js';

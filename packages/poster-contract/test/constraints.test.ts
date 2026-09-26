@@ -39,6 +39,7 @@ const BASE: Spec = {
 
 const video = (over: Partial<MediaFacts> = {}): MediaFacts => ({
   media_id: 'md_TESTMEDIA0000000000000001',
+  status: 'ready',
   kind: 'video',
   mime_type: 'video/mp4',
   duration_s: 10,
@@ -192,6 +193,13 @@ const CASES: Case[] = [
     input: { text: 'words only', media: [] },
     expect: { min_count: 1, actual_count: 0 },
   },
+  {
+    code: 'media_not_ready',
+    label: 'an upload that has not finished',
+    spec: BASE,
+    input: { ...clean, media: [video({ status: 'pending_upload' })] },
+    expect: { status: 'pending_upload' },
+  },
 ];
 
 describe('violation codes', () => {
@@ -239,6 +247,17 @@ describe('violation reporting', () => {
       BASE,
     );
     expect(violations[0]?.media_id).toBe('md_GUILTY00000000000000000001');
+  });
+
+  it('says nothing else about an unfinished upload', () => {
+    // Its dimensions and duration are not known yet, so reporting an aspect ratio
+    // or duration problem alongside would be inventing facts.
+    const violations = validateTarget(
+      { ...clean, media: [video({ status: 'pending_upload', width: null, height: null })] },
+      BASE,
+    );
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.code).toBe('media_not_ready');
   });
 
   it('reports one violation, not two, for a media item of a rejected kind', () => {

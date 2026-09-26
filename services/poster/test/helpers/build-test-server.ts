@@ -28,6 +28,11 @@ import { loadConfig } from '../../src/config.js';
 import { buildServer, type ServerDeps } from '../../src/api/server.js';
 import type { ClientApp, ClientAppStore } from '../../src/db/client-apps.js';
 import type { PlatformConstraintStore } from '../../src/db/platform-constraints.js';
+import type { GrantStore } from '../../src/db/grants.js';
+import type { MediaStore } from '../../src/db/media.js';
+import type { PostStore } from '../../src/db/posts.js';
+import type { MediaProber } from '../../src/media/prober.js';
+import type { MediaStorage } from '../../src/media/storage.js';
 import type {
   ResolvedConnection,
   ValidationContextStore,
@@ -164,13 +169,14 @@ export function createFakeValidationContext(
     ({
       [VIDEO_MEDIA]: {
         media_id: VIDEO_MEDIA,
+        status: 'ready',
         kind: 'video',
         mime_type: 'video/mp4',
         duration_s: 30,
         width: 1080,
         height: 1920,
       },
-    } as Record<string, MediaFacts>);
+    } satisfies Record<string, MediaFacts>);
 
   return {
     resolveConnections(_userId, publicIds) {
@@ -190,6 +196,58 @@ export function createFakeValidationContext(
       return Promise.resolve(found);
     },
   };
+}
+
+/**
+ * Stubs for the dependencies the unit suites do not exercise.
+ *
+ * Post and media behaviour is covered against a real database in
+ * test/integration, because its interesting properties — idempotency under
+ * concurrency, cancel-versus-dispatch, due_at defaulting — are properties of
+ * Postgres, and an in-memory double would only ever test itself. These throw so a
+ * unit test that starts depending on them fails loudly instead of passing against
+ * a fiction.
+ */
+function unavailable(what: string): never {
+  throw new Error(
+    `${what} is not available in unit tests; cover it in test/integration with a real database`,
+  );
+}
+
+export function createStubGrantStore(ungranted: string[] = []): GrantStore {
+  return { findUngranted: () => Promise.resolve(ungranted) };
+}
+
+export function createStubMediaStore(): MediaStore {
+  return {
+    create: () => unavailable('media creation'),
+    find: () => unavailable('media lookup'),
+    markReady: () => unavailable('media completion'),
+    markFailed: () => unavailable('media failure'),
+  };
+}
+
+export function createStubPostStore(): PostStore {
+  return {
+    submit: () => unavailable('post submission'),
+    readStoredResponse: () => unavailable('idempotency replay'),
+    find: () => Promise.resolve(undefined),
+    cancel: () => unavailable('cancel'),
+    replace: () => unavailable('edit'),
+  };
+}
+
+export function createStubStorage(): MediaStorage {
+  return {
+    put: () => unavailable('storage put'),
+    createSignedUpload: () => unavailable('signed uploads'),
+    downloadTo: () => unavailable('storage download'),
+    remove: () => unavailable('storage remove'),
+  };
+}
+
+export function createStubProber(): MediaProber {
+  return { probe: () => unavailable('media probing') };
 }
 
 /** Stands in for Supabase: accepts exactly the tokens it was told about. */
@@ -236,6 +294,13 @@ export async function buildTestServer(
       apps: store,
       constraints: createFakeConstraintStore(),
       validationContext: createFakeValidationContext(),
+      grants: createStubGrantStore(),
+      mediaStore: createStubMediaStore(),
+      postStore: createStubPostStore(),
+      storage: createStubStorage(),
+      prober: createStubProber(),
+      maxDirectUploadBytes: 8 * 1024 * 1024,
+      signedUrlTtlS: 3600,
       appTokens,
       userTokens: overrides.userTokens ?? createFakeUserTokens({}),
       rateLimiter: limiter,

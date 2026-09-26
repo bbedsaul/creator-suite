@@ -40,6 +40,10 @@ RUN pnpm --filter '@suite/poster-service...' build \
 
 # --- runtime -----------------------------------------------------------------
 FROM node:24-alpine AS runtime
+# ffmpeg brings ffprobe, which /v1/media uses to read duration and dimensions.
+# It comes from apk rather than an npm package because the packaged binaries have
+# no musl build (D-062); the Clipper will need the full ffmpeg here regardless.
+RUN apk add --no-cache ffmpeg
 ENV NODE_ENV=production \
     PORT=8080 \
     HOST=0.0.0.0
