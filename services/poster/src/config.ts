@@ -5,6 +5,7 @@ import {
   type DispatchOverrides,
 } from './worker/platforms.js';
 import type { ReconcileConfig } from './worker/reconcile-loop.js';
+import type { DeliverConfig } from './worker/deliver-loop.js';
 
 export type LogLevel = 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
 
@@ -126,6 +127,7 @@ export interface WorkerConfig {
   readonly dispatchDefaults: DispatchDefaults;
   readonly dispatchOverrides: DispatchOverrides;
   readonly reconcile: ReconcileConfig;
+  readonly deliver: DeliverConfig;
 }
 
 export function loadWorkerConfig(): WorkerConfig {
@@ -163,6 +165,16 @@ export function loadWorkerConfig(): WorkerConfig {
       // reason about rather than an unbounded wait.
       pollIntervalMs: intEnv('RECONCILE_POLL_INTERVAL_MS', 15_000),
       lookupTimeoutMs: intEnv('LOOKUP_TIMEOUT_MS', 15_000),
+    },
+    deliver: {
+      batchSize: intEnv('WEBHOOK_BATCH_SIZE', 25),
+      pollIntervalMs: intEnv('WEBHOOK_POLL_INTERVAL_MS', 2_000),
+      leaseMs: intEnv('WEBHOOK_LEASE_MS', 60_000),
+      timeoutMs: intEnv('WEBHOOK_TIMEOUT_MS', 10_000),
+      // Contract §7: retry for up to 24 hours.
+      giveUpAfterMs: intEnv('WEBHOOK_GIVE_UP_AFTER_MS', 24 * 60 * 60 * 1000),
+      baseBackoffMs: intEnv('WEBHOOK_BASE_BACKOFF_MS', 10_000),
+      maxBackoffMs: intEnv('WEBHOOK_MAX_BACKOFF_MS', 60 * 60 * 1000),
     },
   };
 }

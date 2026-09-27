@@ -1,6 +1,11 @@
-# Social Poster — Internal API Contract (v1.4)
+# Social Poster — Internal API Contract (v1.5)
 
-*Creator Suite · v1.4 2026-09-26 (v1.3, v1.2, v1.1 all 2026-09-26; v1 2026-09-19). Repo copy; this file is now the source of truth for implementation. The machine-readable form lives in `packages/poster-contract` (zod → OpenAPI, DECISIONS D-026), and the two must agree.*
+*Creator Suite · v1.5 2026-09-26 (v1.4, v1.3, v1.2, v1.1 all 2026-09-26; v1 2026-09-19). Repo copy; this file is now the source of truth for implementation. The machine-readable form lives in `packages/poster-contract` (zod → OpenAPI, DECISIONS D-026), and the two must agree.*
+
+**v1.5 changes, all additive and non-breaking under §10:**
+- §7: every event type now has a zod payload schema, and the signature rules are stated precisely (raw bytes, replay window, unknown types tolerated).
+- §7: `grant.updated` carries `grant_id` as a prefixed `gr_` id rather than a raw uuid; `gr_` is registered in §8's prefix list (D-078).
+- §8: `gr_` added to the public id prefixes.
 
 **v1.4 changes, all additive and non-breaking under §10:**
 - §5: `POST /v1/media` specified with both upload paths, plus `POST /v1/media/{id}/complete` (D-061).
@@ -252,6 +257,8 @@ Delivery is **at-least-once**, ordering not guaranteed — consumers deduplicate
 | `grant.updated` | Consent granted or revoked | full grant state |
 | `connection.revoked` / `connection.restored` | Vault refresh outcome | `connection_id`, `platform` |
 
+The table has seven rows, but `connection.revoked` and `connection.restored` share one, so there are **eight type strings**. Each has a payload schema in `packages/poster-contract` *(v1.5)*.
+
 Payload shape:
 
 ```
@@ -264,7 +271,16 @@ X-Poster-Signature: t=1758290400,v1=<hmac-sha256 of t + "." + body>
   "data": { "permalink": "https://tiktok.com/@billbuilds/video/123" } }
 ```
 
-Signatures use a per-app webhook secret; reject if the timestamp is older than 5 minutes (replay window).
+Every id in the body is a public prefixed id, including ids nested in `data` — `post.paused` and the `connection.*` events carry `connection_id` as `cn_…`, and `grant.updated` carries `grant_id` as `gr_…` *(v1.5)*. `user_id` stays a uuid, as it is everywhere else in the API.
+
+**Signatures** use a per-app webhook secret, held in a secrets manager and referenced from the database, never stored there. Four rules a consumer must follow:
+
+1. Verify the HMAC over the **raw request bytes**. Parsing and re-serialising the JSON changes the bytes and the signature will not match.
+2. The signed value is `"{t}.{raw body}"` — the timestamp, a literal dot, then the body.
+3. Reject a timestamp older than **5 minutes**. The signature never expires on its own, so this is the only thing standing between you and a replayed capture.
+4. Tolerate event types you do not recognise (§1, §10) rather than rejecting the delivery.
+
+A working reference consumer that does all four, plus `event_id` deduplication, ships in `tools/webhook-sink` *(v1.5)*.
 
 ## 8. Errors & constraint rejections
 
@@ -283,7 +299,7 @@ Every envelope carries `request_id`, which is also returned in the `X-Request-Id
         "constraint": { "max_duration_s": 600, "actual_s": 745 } } ] } }
 ```
 
-**Public IDs** *(v1.2)*: `<prefix>_<26 characters>`, where the body is Crockford base32 of the resource's UUID. Prefixes are `po_` post, `tg_` target, `cn_` connection, `md_` media, `ev_` event, `sr_` scope request. The alphabet excludes I, L, O and U and is case-insensitive on input, so an ID survives being read aloud or retyped. A malformed or unknown ID is always `404 not_found`, never a 500.
+**Public IDs** *(v1.2)*: `<prefix>_<26 characters>`, where the body is Crockford base32 of the resource's UUID. Prefixes are `po_` post, `tg_` target, `cn_` connection, `md_` media, `ev_` event, `sr_` scope request, `gr_` grant *(v1.5)*. The alphabet excludes I, L, O and U and is case-insensitive on input, so an ID survives being read aloud or retyped. A malformed or unknown ID is always `404 not_found`, never a 500.
 
 | HTTP | Code | Meaning |
 | --- | --- | --- |

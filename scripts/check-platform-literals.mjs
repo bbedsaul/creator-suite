@@ -29,7 +29,7 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** Directories whose src/ is application code subject to the rules. */
-const ROOTS = ['services', 'packages', 'apps'];
+const ROOTS = ['services', 'packages', 'apps', 'tools'];
 
 /** Paths that may legitimately name a platform. */
 const PLATFORM_NAME_ALLOWED = [

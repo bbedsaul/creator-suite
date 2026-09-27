@@ -101,6 +101,7 @@ pnpm -F @suite/poster-service seed:constraints   # load platform specs -> DB, en
 pnpm -F @suite/poster-service seed:grants -- --user <uuid> [--app trainer-dev]   # dev grants (D-067)
 pnpm lint:limits                                 # no platform limit hard-coded in TS (rule 9)
 pnpm lint:limits:verify                          # proves lint:limits rejects real violations
+WEBHOOK_SECRET=… pnpm -F @suite/webhook-sink start --port 4000   # reference consumer (D-079)
 pnpm -F @suite/poster-service dev:api      # backend alone — no frontend needed
 pnpm -F @suite/poster-service dev:worker    # needs VAULT_MASTER_KEY (D-071):
                                            #   openssl rand -base64 32

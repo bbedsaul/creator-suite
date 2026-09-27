@@ -52,6 +52,16 @@ module.exports = {
       to: { path: '^services/[^/]+/' },
     },
     {
+      name: 'no-tools-to-service',
+      comment:
+        'tools/* are standalone. The reference webhook consumer in particular must ' +
+        'work like a third party, so anything it could import from the service ' +
+        'would be a shortcut a real integrator does not have (D-079).',
+      severity: 'error',
+      from: { path: '^tools/[^/]+/' },
+      to: { path: '^services/[^/]+/' },
+    },
+    {
       name: 'no-circular',
       comment: 'Circular dependencies make build order and reasoning unreliable.',
       severity: 'error',

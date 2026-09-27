@@ -21,7 +21,7 @@ function jsonResponse(
 
 describe('contract version', () => {
   it('targets the version the schemas were generated from (D-027)', () => {
-    expect(TARGET_CONTRACT_VERSION).toBe('1.4');
+    expect(TARGET_CONTRACT_VERSION).toBe('1.5');
   });
 });
 

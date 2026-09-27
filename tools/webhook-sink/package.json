@@ -1,0 +1,35 @@
+{
+  "name": "@suite/webhook-sink",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Reference webhook consumer: verifies signatures, rejects replays, dedupes on event_id.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "start": "node dist/cli.js",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@suite/poster-contract": "workspace:*",
+    "@suite/server-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

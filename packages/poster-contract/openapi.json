@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Social Poster internal API",
-    "version": "1.4",
+    "version": "1.5",
     "description": "Cross-platform publishing API. Two auth modes share every /v1 route (D-023): app mode uses a client-credentials JWT, user mode uses the signed-in user’s Supabase session JWT and acts as the first-party poster-web app."
   },
   "servers": [

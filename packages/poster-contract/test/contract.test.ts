@@ -5,8 +5,8 @@ import { AuthContext, TokenRequest, TokenResponse } from '../src/auth.js';
 import { buildOpenApiDocument } from '../src/openapi.js';
 
 describe('contract version', () => {
-  it('is 1.4, matching the repo doc (D-027, bumped in S05 for the media and post routes)', () => {
-    expect(CONTRACT_VERSION).toBe('1.4');
+  it('is 1.5, matching the repo doc (D-027, bumped in S08 for the webhook schemas)', () => {
+    expect(CONTRACT_VERSION).toBe('1.5');
   });
 });
 

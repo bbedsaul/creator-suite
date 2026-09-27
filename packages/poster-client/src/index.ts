@@ -14,7 +14,7 @@ import type { paths } from './schema.js';
 export type { paths, components, operations } from './schema.js';
 
 /** Contract version the generated types were produced from. */
-export const TARGET_CONTRACT_VERSION = '1.4' as const;
+export const TARGET_CONTRACT_VERSION = '1.5' as const;
 
 export interface PosterClientOptions {
   /** Service root, e.g. https://poster.example.com or http://localhost:8080. */

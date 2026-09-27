@@ -40,6 +40,21 @@ export {
 } from './envelope.js';
 
 export {
+  SecretNotFoundError,
+  InvalidSecretRefError,
+  createEnvSecretsManager,
+  createStaticSecretsManager,
+  type SecretsManager,
+} from './secrets-manager.js';
+
+export {
+  signWebhook,
+  verifyWebhook,
+  type VerifyWebhookOptions,
+  type WebhookVerification,
+} from './webhook-signature.js';
+
+export {
   InMemoryRateLimiter,
   type RateLimiter,
   type RateLimitVerdict,

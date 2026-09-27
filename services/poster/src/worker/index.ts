@@ -7,7 +7,7 @@
  */
 import { hostname } from 'node:os';
 import pino from 'pino';
-import { createLocalKeyManager } from '@suite/server-core';
+import { createEnvSecretsManager, createLocalKeyManager } from '@suite/server-core';
 import { createFakeAdapter } from '../adapters/fake.js';
 import { createAdapterRegistry } from '../adapters/registry.js';
 import { loadConfig, loadWorkerConfig } from '../config.js';
@@ -15,6 +15,7 @@ import { createPool } from '../db/pool.js';
 import { createCredentialVault } from '../vault/credentials.js';
 import { startDispatchLoop, type DispatchLoop } from './dispatch-loop.js';
 import { startReconcileLoop } from './reconcile-loop.js';
+import { startDeliverLoop } from './deliver-loop.js';
 import { loadDispatchablePlatforms } from './platforms.js';
 
 const config = loadConfig();
@@ -70,7 +71,15 @@ const reconciler = startReconcileLoop(
   stopping.signal,
 );
 
-const running = Promise.all([...loops.map((loop) => loop.done), reconciler.done]);
+// Webhook delivery is independent of dispatch: a wedged consumer must not slow
+// posting down, and a platform outage must not stop events already recorded.
+const deliverer = startDeliverLoop(
+  workerConfig.deliver,
+  { sql, secrets: createEnvSecretsManager(), logger },
+  stopping.signal,
+);
+
+const running = Promise.all([...loops.map((loop) => loop.done), reconciler.done, deliverer.done]);
 
 // Signal handling is deliberately not the shared installShutdownHandlers helper's
 // job to know about loops: it takes a hook, and this is the hook.

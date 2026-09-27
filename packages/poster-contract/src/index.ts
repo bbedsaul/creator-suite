@@ -20,6 +20,7 @@ export {
   MediaId,
   EventId,
   ScopeRequestId,
+  GrantId,
   type ResourceKind,
   type IdPrefix,
 } from './ids.js';
@@ -88,5 +89,24 @@ export {
   PatchPostRequest,
   CancelPostResponse,
 } from './posts.js';
+
+export {
+  WEBHOOK_EVENT_TYPES,
+  SIGNATURE_HEADER,
+  SIGNATURE_MAX_AGE_S,
+  WebhookEventType,
+  WebhookEvent,
+  WebhookEnvelope,
+  PostScheduledData,
+  PostPostedData,
+  PostFailedData,
+  PostPausedData,
+  PostResumedData,
+  GrantUpdatedData,
+  ConnectionEventData,
+  parseSignatureHeader,
+  signedPayload,
+  formatSignatureHeader,
+} from './webhooks.js';
 
 export { buildOpenApiDocument } from './openapi.js';

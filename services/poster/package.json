@@ -36,6 +36,7 @@
   "devDependencies": {
     "@ffprobe-installer/ffprobe": "^2.1.2",
     "@suite/poster-client": "workspace:*",
+    "@suite/webhook-sink": "workspace:*",
     "@types/node": "^24.19.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",

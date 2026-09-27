@@ -345,7 +345,6 @@ describe('chaos: SIGKILL around the adapter call (criterion 1)', () => {
     // Guard against a vacuous pass. "100 targets posted, none twice" would also be
     // true if no child ever actually died, which is the one way this test could
     // look green while proving nothing.
-    // eslint-disable-next-line no-console
     console.log(`chaos: ${String(killed)} of ${String(RUNS)} children were SIGKILLed`);
     expect(killed, 'no child actually crashed; the test would be vacuous').toBeGreaterThanOrEqual(
       RUNS / 2,
@@ -407,7 +406,6 @@ describe('chaos: SIGKILL around the adapter call (criterion 1)', () => {
     }
 
     const duplicated = [...byTarget.entries()].filter(([, count]) => count > 1);
-    // eslint-disable-next-line no-console
     console.log(
       `chaos: ${String(RUNS)} runs, ${String(log.length)} publishes across ` +
         `${String(byTarget.size)} targets, ${String(duplicated.length)} duplicated`,
@@ -428,7 +426,6 @@ describe('chaos: SIGKILL around the adapter call (criterion 1)', () => {
       select state::text as state, count(*) as n from poster.post_targets
        where id = any(${sql.array(chaosTargetIds)}::uuid[])
        group by state order by state`;
-    // eslint-disable-next-line no-console
     console.log(`chaos: final states ${states.map((row) => `${row.state}=${row.n}`).join(' ')}`);
 
     const stuck = states.find((row) => row.state === 'dispatching');
@@ -449,7 +446,6 @@ describe('chaos: SIGKILL around the adapter call (criterion 1)', () => {
 
     // And reconciliation did real work, rather than the crashes happening to land
     // somewhere harmless every time.
-    // eslint-disable-next-line no-console
     console.log(
       `chaos: reconciler posted ${String(reconciled.posted)}, retried ${String(reconciled.retried)}, ` +
         `failed-unknown ${String(reconciled.failedUnknown)}`,
@@ -529,7 +525,6 @@ describe('nothing stays in dispatching beyond lease plus a tick (criterion 2)', 
     // The documented bound: the lease, plus at most one reconciler tick, plus
     // slack for the round trips.
     const bound = leaseMs + pollIntervalMs + 1_000;
-    // eslint-disable-next-line no-console
     console.log(
       `chaos: stale dispatch resolved in ${String(resolvedMs)}ms (bound ${String(bound)}ms)`,
     );

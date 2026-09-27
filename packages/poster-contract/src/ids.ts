@@ -23,6 +23,9 @@ export const ID_PREFIXES = {
   media: 'md',
   event: 'ev',
   scope_request: 'sr',
+  // Added in v1.5: grant.updated webhooks reference a grant, and rule 7 says a new
+  // resource type on the wire needs a registered prefix rather than a bare uuid.
+  grant: 'gr',
 } as const;
 
 export type ResourceKind = keyof typeof ID_PREFIXES;
@@ -157,3 +160,4 @@ export const ConnectionId = publicId('connection');
 export const MediaId = publicId('media');
 export const EventId = publicId('event');
 export const ScopeRequestId = publicId('scope_request');
+export const GrantId = publicId('grant');

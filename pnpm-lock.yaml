@@ -141,12 +141,34 @@ importers:
       '@suite/poster-client':
         specifier: workspace:*
         version: link:../../packages/poster-client
+      '@suite/webhook-sink':
+        specifier: workspace:*
+        version: link:../../tools/webhook-sink
       '@types/node':
         specifier: ^24.19.0
         version: 24.19.0
       tsx:
         specifier: ^4.20.6
         version: 4.23.15
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@24.19.0)(tsx@4.23.15)
+
+  tools/webhook-sink:
+    dependencies:
+      '@suite/poster-contract':
+        specifier: workspace:*
+        version: link:../../packages/poster-contract
+      '@suite/server-core':
+        specifier: workspace:*
+        version: link:../../packages/server-core
+    devDependencies:
+      '@types/node':
+        specifier: ^24.19.0
+        version: 24.19.0
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
