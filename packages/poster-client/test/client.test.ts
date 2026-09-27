@@ -3,6 +3,8 @@
  * that runtime: that it attaches a fresh token per request, and that `unwrap`
  * turns the contract envelope into something a caller can switch on.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { PosterError, TARGET_CONTRACT_VERSION, createPosterClient, unwrap } from '../src/index.js';
 
@@ -21,7 +23,17 @@ function jsonResponse(
 
 describe('contract version', () => {
   it('targets the version the schemas were generated from (D-027)', () => {
-    expect(TARGET_CONTRACT_VERSION).toBe('1.5');
+    expect(TARGET_CONTRACT_VERSION).toBe('1.6');
+    // And that the literal above is not merely stale: the spec the types were
+    // generated from has to agree. A bump that edits one and not the other is
+    // exactly the drift D-027 is about.
+    const spec = JSON.parse(
+      readFileSync(
+        join(import.meta.dirname, '..', '..', 'poster-contract', 'openapi.json'),
+        'utf8',
+      ),
+    ) as { info: { version: string } };
+    expect(spec.info.version).toBe(TARGET_CONTRACT_VERSION);
   });
 });
 

@@ -29,7 +29,7 @@ import { createGrantStore } from '../../src/db/grants.js';
 import { createMediaStore } from '../../src/db/media.js';
 import { createPostStore } from '../../src/db/posts.js';
 import { createStubProber, createStubStorage } from '../helpers/build-test-server.js';
-import { TEST_CLIENT_ID, TEST_CLIENT_SECRET, seed } from '../../src/seed.js';
+import { M1_DEMO_CLIENT_ID, TEST_CLIENT_ID, TEST_CLIENT_SECRET, seed } from '../../src/seed.js';
 
 const DATABASE_URL =
   process.env['POSTER_TEST_DATABASE_URL'] ??
@@ -76,9 +76,8 @@ async function supabase(path: string, body: unknown): Promise<Record<string, unk
  * they are ordinary development fixtures, the pgTAP suites no longer collide with
  * them, and deleting them would quietly undo a developer's `pnpm seed`.
  *
- * Note that running this suite does rotate the seeded secrets, because testing
- * the seed script means running it. Re-run `pnpm -F @suite/poster-service seed`
- * to refresh .env.local afterwards.
+ * The rotation test is scoped to `trainer-dev` (D-101), so running this suite no
+ * longer invalidates the other seeded secrets sitting in a developer's .env.local.
  */
 async function cleanup(): Promise<void> {
   for (const user of USERS) {
@@ -179,11 +178,24 @@ describe('environment', () => {
 });
 
 describe('the seed script (D-049)', () => {
-  it('registers poster-web, trainer-dev and test-client', async () => {
+  it('registers poster-web, trainer-dev, test-client and m1-demo', async () => {
     const rows = await sql<{ client_id: string; first_party: boolean }[]>`
       select client_id, first_party from poster.client_apps order by client_id`;
-    expect(rows.map((row) => row.client_id)).toEqual(['poster-web', TEST_CLIENT_ID, 'trainer-dev']);
+    // Every seeded app, exactly: an app that appears here without being listed is
+    // an app someone can get a token for, so the assertion is a whitelist rather
+    // than a `toContain`.
+    expect(rows.map((row) => row.client_id)).toEqual([
+      M1_DEMO_CLIENT_ID,
+      'poster-web',
+      TEST_CLIENT_ID,
+      'trainer-dev',
+    ]);
     expect(rows.find((row) => row.client_id === 'poster-web')?.first_party).toBe(true);
+    // Only the composer is first-party (D-023): a third-party app must not be able
+    // to act in user mode.
+    expect(rows.filter((row) => row.first_party).map((row) => row.client_id)).toEqual([
+      'poster-web',
+    ]);
   });
 
   it('stores argon2id hashes, never plaintext secrets', async () => {
@@ -213,7 +225,10 @@ describe('the seed script (D-049)', () => {
   it('rotates on request, without duplicating the row', async () => {
     const before = await sql<{ client_secret_hash: string }[]>`
       select client_secret_hash from poster.client_apps where client_id = 'trainer-dev'`;
-    const entries = await seed(DATABASE_URL, { rotate: true });
+    // Scoped to trainer-dev, which is the only app this test asserts on. An
+    // unscoped rotate also invalidates every other generated secret, including the
+    // one tools/m1-demo reads from .env.local (D-101).
+    const entries = await seed(DATABASE_URL, { rotate: true, only: ['trainer-dev'] });
     const after = await sql<{ client_secret_hash: string }[]>`
       select client_secret_hash from poster.client_apps where client_id = 'trainer-dev'`;
 

@@ -40,6 +40,29 @@ const errorResponse = (description: string): JsonSchema => ({
   content: { 'application/json': { schema: ref('ErrorEnvelope') } },
 });
 
+/**
+ * `user_id` as a query parameter (v1.6, D-096).
+ *
+ * The post-scoped routes need it and have always accepted it, but it was never
+ * declared — so a client generated from this spec had no typed way to send it,
+ * and `GET`, `PATCH` and `cancel` were unreachable in app mode. Found by the M1
+ * exit demo, which is the first thing to consume the generated client the way an
+ * integrator does.
+ *
+ * Optional here rather than required because user mode does not need it: the
+ * token subject supplies the user, and a mismatch is `403 forbidden_user`.
+ */
+const userIdQuery = {
+  name: 'user_id',
+  in: 'query',
+  required: false,
+  schema: { type: 'string', format: 'uuid' },
+  description:
+    'The user whose post this is. Required in app mode, where the token carries no ' +
+    'user; in user mode it must equal the token subject or the request is rejected ' +
+    'with forbidden_user.',
+} as const;
+
 export function buildOpenApiDocument(): JsonSchema {
   return {
     openapi: '3.0.3',
@@ -310,7 +333,10 @@ export function buildOpenApiDocument(): JsonSchema {
           summary: 'Read a post and its targets',
           tags: ['posts'],
           security: [{ bearerAuth: [] }],
-          parameters: [{ name: 'post_id', in: 'path', required: true, schema: { type: 'string' } }],
+          parameters: [
+            { name: 'post_id', in: 'path', required: true, schema: { type: 'string' } },
+            userIdQuery,
+          ],
           responses: {
             '200': {
               description: 'The post, with per-target state and outcomes.',
@@ -328,7 +354,10 @@ export function buildOpenApiDocument(): JsonSchema {
             'has begun dispatching, because the content may already be on its way.',
           tags: ['posts'],
           security: [{ bearerAuth: [] }],
-          parameters: [{ name: 'post_id', in: 'path', required: true, schema: { type: 'string' } }],
+          parameters: [
+            { name: 'post_id', in: 'path', required: true, schema: { type: 'string' } },
+            userIdQuery,
+          ],
           requestBody: {
             required: true,
             content: { 'application/json': { schema: ref('PatchPostRequest') } },
@@ -357,7 +386,10 @@ export function buildOpenApiDocument(): JsonSchema {
             '200 with an empty `canceled_target_ids`, so a retry is safe.',
           tags: ['posts'],
           security: [{ bearerAuth: [] }],
-          parameters: [{ name: 'post_id', in: 'path', required: true, schema: { type: 'string' } }],
+          parameters: [
+            { name: 'post_id', in: 'path', required: true, schema: { type: 'string' } },
+            userIdQuery,
+          ],
           responses: {
             '200': {
               description: 'Cancel applied, or already canceled.',

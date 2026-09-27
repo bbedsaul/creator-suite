@@ -48,6 +48,9 @@ packages/ui/            frontend-only: design tokens, components
 packages/media-pipeline/   backend-only (built with the Clipper; extended by the Trainer)
 supabase/migrations/    all schemas; Poster lives in the `poster` schema
 supabase/tests/         pgTAP tests
+supabase/observability/ §11 operational queries, plain SQL (D-097)
+tools/webhook-sink/     reference webhook consumer (D-079)
+tools/m1-demo/          M1 exit demo: HTTP-only, generated client (D-093)
 docs/                   PRDs, API contract, session plan
 DECISIONS.md            judgment calls, append-only
 ```
@@ -91,7 +94,9 @@ pnpm install
 pnpm exec supabase start && pnpm exec supabase db reset   # applies all migrations
 pnpm exec supabase test db                 # pgTAP
 pnpm -F @suite/poster-service test
-pnpm -F @suite/poster-service test:integration   # needs a running local stack (D-040)
+pnpm -F @suite/poster-service test:integration   # needs a running local stack (D-040);
+                                                 #   stop dev:worker first — a second worker
+                                                 #   claims the tests' targets (D-101)
 LIVE_ADAPTER_TESTS=1 pnpm -F @suite/poster-service test:live   # real aggregator accounts (D-091)
                                                  #   + LIVE_ADAPTER_PUBLISH=1 to actually post
 pnpm -F @suite/poster-service gen:types          # regenerate DB types after a migration
@@ -101,6 +106,8 @@ pnpm gen:check                                   # committed spec + client match
 pnpm gen:types:check                             # committed DB types match the migrations
 pnpm -F @suite/poster-service seed:constraints   # load platform specs -> DB, enables them (D-058)
 pnpm -F @suite/poster-service seed:grants -- --user <uuid> [--app trainer-dev]   # dev grants (D-067)
+pnpm -F @suite/poster-service seed:demo          # demo user + connections + webhook (D-094)
+pnpm -F @suite/m1-demo start                     # M1 exit demo, client-only (D-093)
 pnpm lint:limits                                 # no platform limit hard-coded in TS (rule 9)
 pnpm lint:limits:verify                          # proves lint:limits rejects real violations
 WEBHOOK_SECRET=… pnpm -F @suite/webhook-sink start --port 4000   # reference consumer (D-079)

@@ -1,6 +1,10 @@
-# Social Poster — Internal API Contract (v1.5)
+# Social Poster — Internal API Contract (v1.6)
 
-*Creator Suite · v1.5 2026-09-26 (v1.4, v1.3, v1.2, v1.1 all 2026-09-26; v1 2026-09-19). Repo copy; this file is now the source of truth for implementation. The machine-readable form lives in `packages/poster-contract` (zod → OpenAPI, DECISIONS D-026), and the two must agree.*
+*Creator Suite · v1.6 2026-09-26 (v1.5, v1.4, v1.3, v1.2, v1.1 all 2026-09-26; v1 2026-09-19). Repo copy; this file is now the source of truth for implementation. The machine-readable form lives in `packages/poster-contract` (zod → OpenAPI, DECISIONS D-026), and the two must agree.*
+
+**v1.6 changes, additive and non-breaking under §10:**
+
+- **§5.3** — `user_id` is documented as a query parameter on `GET`, `PATCH` and `cancel` for `/v1/posts/{post_id}`. It is **required in app mode**, where the token carries no user, and optional in user mode, where the token subject supplies it. No behaviour changed: the service has always accepted it. It was simply never declared in the OpenAPI spec, so a client generated from the spec had no typed way to send it and those three routes were unreachable in app mode. Found by the M1 exit demo, the first consumer to use the generated client the way an integrator does (D-096).
 
 **v1.5 changes, all additive and non-breaking under §10:**
 - §7: every event type now has a zod payload schema, and the signature rules are stated precisely (raw bytes, replay window, unknown types tolerated).
@@ -203,14 +207,15 @@ Runs exactly the validation `POST /v1/posts` runs and returns exactly the same 4
 ### 5.3 Reading, editing and cancelling *(v1.4)*
 
 ```
-GET   /v1/posts/{post_id}          → 200 the post, with per-target state and outcomes
-PATCH /v1/posts/{post_id}          → 200 updated, re-validated (FR-13)
-POST  /v1/posts/{post_id}/cancel   → 200 { canceled_target_ids: [ … ] }
+GET   /v1/posts/{post_id}[?user_id=…]          → 200 the post, with per-target state and outcomes
+PATCH /v1/posts/{post_id}[?user_id=…]          → 200 updated, re-validated (FR-13)
+POST  /v1/posts/{post_id}/cancel[?user_id=…]   → 200 { canceled_target_ids: [ … ] }
 ```
 
 - `PATCH` replaces the target list wholesale when `targets` is given, and re-runs the same validation as submission. It is refused with `409 too_late` once **any** target has begun dispatching, because the content may already be on its way.
 - `cancel` cancels every target that has not begun dispatching. When some targets are dispatching and others are not, the cancellable ones are cancelled and the response says which — a dispatching target genuinely cannot be recalled, and refusing the whole call would leave the others queued for no reason. `409 too_late` is returned only when **nothing** could be cancelled. Cancelling an already-cancelled post is `200` with an empty `canceled_target_ids`, so a retry is safe.
 - In app mode these are scoped to the calling app's own posts. In user mode they are scoped to the user, who sees every post made on their behalf whichever app created it.
+- **`user_id` is required in app mode** *(v1.6)*, as a query parameter, or in the body for `PATCH`. An app token carries no user, so the app states which user it is acting for; the request is then scoped to that user *and* the calling app. In user mode it may be omitted, and if supplied must equal the token subject (`403 forbidden_user`).
 
 ## 6. Post lifecycle & states
 

@@ -3,6 +3,7 @@
  *
  *   pnpm -F @suite/poster-service seed
  *   pnpm -F @suite/poster-service seed -- --rotate
+ *   pnpm -F @suite/poster-service seed -- --rotate --only trainer-dev
  *
  * Secrets are generated, hashed with argon2id, and written to a gitignored
  * .env.local; the plaintext is shown once and never stored (D-049).
@@ -27,6 +28,9 @@ import { createPool } from './db/pool.js';
 /** Published on purpose so tests can hardcode it. Never grant this app anything real. */
 export const TEST_CLIENT_ID = 'test-client';
 export const TEST_CLIENT_SECRET = 'test-client-secret-do-not-use-outside-tests';
+
+/** The M1 exit demo's app. Secret is generated; see `envVarName`. */
+export const M1_DEMO_CLIENT_ID = 'm1-demo';
 
 interface SeedApp {
   readonly clientId: string;
@@ -57,6 +61,16 @@ const APPS: readonly SeedApp[] = [
     rateLimitPerMin: 600,
     fixedSecret: TEST_CLIENT_SECRET,
   },
+  {
+    // The M1 exit demo (tools/m1-demo, D-093). A generated secret, not the
+    // published test one, because this app runs against staging as well as
+    // locally and D-049 says the published credential must never be granted
+    // anything in a real environment.
+    clientId: M1_DEMO_CLIENT_ID,
+    name: 'M1 exit demo',
+    firstParty: false,
+    rateLimitPerMin: 600,
+  },
 ];
 
 export type SeedStatus = 'created' | 'rotated' | 'preserved';
@@ -74,6 +88,18 @@ export interface SeedEntry {
 export interface SeedOptions {
   /** Issue new secrets for apps that already exist. Default false. */
   readonly rotate?: boolean;
+  /**
+   * Restrict this run to these client ids. Default: every app in `APPS`.
+   *
+   * Exists so a rotation touches only what it means to. Rotating everything is a
+   * destructive side effect — the old secrets are unrecoverable hashes — and an
+   * unscoped `{ rotate: true }` in the integration suite silently invalidated the
+   * generated secrets in a developer's .env.local, which showed up much later as
+   * an unexplained `invalid_token` from an unrelated tool (D-101). It is also the
+   * operational shape: rotating one app's credential should not force every other
+   * consumer to re-deploy.
+   */
+  readonly only?: readonly string[];
 }
 
 function generateSecret(): string {
@@ -84,8 +110,21 @@ export async function seed(databaseUrl: string, options: SeedOptions = {}): Prom
   const sql = createPool({ databaseUrl, max: 2 });
   const results: SeedEntry[] = [];
 
+  const requested = options.only;
+  if (requested !== undefined) {
+    const known = new Set(APPS.map((app) => app.clientId));
+    const unknown = requested.filter((clientId) => !known.has(clientId));
+    if (unknown.length > 0) {
+      // A typo here would silently rotate nothing and report success, which is the
+      // worst outcome for a credential operation.
+      throw new Error(`Unknown client id(s): ${unknown.join(', ')}`);
+    }
+  }
+  const selected =
+    requested === undefined ? APPS : APPS.filter((app) => requested.includes(app.clientId));
+
   try {
-    for (const app of APPS) {
+    for (const app of selected) {
       const existing = await sql<{ id: string }[]>`
         select id from poster.client_apps where client_id = ${app.clientId}`;
       const exists = existing.length > 0;
@@ -167,10 +206,18 @@ function isDirectRun(): boolean {
 if (isDirectRun()) {
   const databaseUrl = requireEnv('DATABASE_URL');
   const rotate = process.argv.includes('--rotate');
+  const onlyIndex = process.argv.indexOf('--only');
+  const only =
+    onlyIndex === -1
+      ? undefined
+      : (process.argv[onlyIndex + 1] ?? '')
+          .split(',')
+          .map((clientId) => clientId.trim())
+          .filter((clientId) => clientId !== '');
   const repoRoot = join(import.meta.dirname, '..', '..', '..');
   const envPath = join(repoRoot, '.env.local');
 
-  const entries = await seed(databaseUrl, { rotate });
+  const entries = await seed(databaseUrl, { rotate, ...(only === undefined ? {} : { only }) });
 
   let existing = '';
   try {

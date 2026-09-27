@@ -17,6 +17,7 @@
     "seed": "node --env-file-if-exists=../../.env.local dist/seed.js",
     "seed:constraints": "node dist/seed-constraints.js",
     "seed:grants": "node dist/seed-grants.js",
+    "seed:demo": "node --env-file-if-exists=../../.env.local dist/seed-demo.js",
     "dev:api": "pnpm --filter='@suite/poster-service^...' build && exec tsx watch src/api/index.ts",
     "dev:worker": "pnpm --filter='@suite/poster-service^...' build && exec tsx watch src/worker/index.ts",
     "start:api": "node dist/api/index.js",
@@ -39,6 +40,8 @@
     "@suite/poster-client": "workspace:*",
     "@suite/webhook-sink": "workspace:*",
     "@types/node": "^24.19.0",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"

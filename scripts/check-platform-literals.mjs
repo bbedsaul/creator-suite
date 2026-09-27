@@ -35,6 +35,10 @@ const ROOTS = ['services', 'packages', 'apps', 'tools'];
 const PLATFORM_NAME_ALLOWED = [
   /^services\/[^/]+\/src\/adapters\//,
   /^packages\/media-pipeline\/src\//,
+  // The M1 exit criterion is literally "a scheduled video post to TikTok and
+  // YouTube", so the demo that proves it names those two platforms. It reads every
+  // *limit* from GET /v1/platforms/constraints, which is what rule 9 is about.
+  /^tools\/m1-demo\/src\//,
 ];
 
 /**
@@ -50,6 +54,14 @@ const ALLOWLIST = [
       'length(key) between 1 and 255 check on poster.idempotency_keys. It is an API ' +
       'limit we set, not a platform rule we are told, so it does not belong in a ' +
       'constraint spec.',
+  },
+  {
+    file: 'services/poster/src/seed-demo.ts',
+    line: "['tiktok', 'youtube']",
+    reason:
+      'The two platforms the M1 exit criterion names, seeded as fixtures for the exit ' +
+      'demo (D-094). Naming them is the point of the fixture; no platform *limit* is ' +
+      'written here, and the demo reads every limit from the constraints endpoint.',
   },
 ];
 

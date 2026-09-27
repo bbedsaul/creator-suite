@@ -1078,7 +1078,10 @@ export interface operations {
   };
   getPost: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description The user whose post this is. Required in app mode, where the token carries no user; in user mode it must equal the token subject or the request is rejected with forbidden_user. */
+        user_id?: string;
+      };
       header?: never;
       path: {
         post_id: string;
@@ -1118,7 +1121,10 @@ export interface operations {
   };
   patchPost: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description The user whose post this is. Required in app mode, where the token carries no user; in user mode it must equal the token subject or the request is rejected with forbidden_user. */
+        user_id?: string;
+      };
       header?: never;
       path: {
         post_id: string;
@@ -1198,7 +1204,10 @@ export interface operations {
   };
   cancelPost: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description The user whose post this is. Required in app mode, where the token carries no user; in user mode it must equal the token subject or the request is rejected with forbidden_user. */
+        user_id?: string;
+      };
       header?: never;
       path: {
         post_id: string;
