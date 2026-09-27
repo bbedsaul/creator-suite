@@ -14,6 +14,7 @@ import { loadConfig, loadWorkerConfig } from '../config.js';
 import { createPool } from '../db/pool.js';
 import { createCredentialVault } from '../vault/credentials.js';
 import { startDispatchLoop, type DispatchLoop } from './dispatch-loop.js';
+import { startReconcileLoop } from './reconcile-loop.js';
 import { loadDispatchablePlatforms } from './platforms.js';
 
 const config = loadConfig();
@@ -61,7 +62,15 @@ const loops: DispatchLoop[] = platforms.map((platform) =>
   ),
 );
 
-const running = Promise.all(loops.map((loop) => loop.done));
+// One reconciler for the whole worker, not one per platform: it is off the hot
+// path, and a stale dispatch is rare by construction (D-075).
+const reconciler = startReconcileLoop(
+  workerConfig.reconcile,
+  { sql, vault, adapterFor: (platformId) => registry.for(platformId), logger },
+  stopping.signal,
+);
+
+const running = Promise.all([...loops.map((loop) => loop.done), reconciler.done]);
 
 // Signal handling is deliberately not the shared installShutdownHandlers helper's
 // job to know about loops: it takes a hook, and this is the hook.

@@ -4,6 +4,7 @@ import {
   type DispatchDefaults,
   type DispatchOverrides,
 } from './worker/platforms.js';
+import type { ReconcileConfig } from './worker/reconcile-loop.js';
 
 export type LogLevel = 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
 
@@ -124,6 +125,7 @@ export interface WorkerConfig {
   readonly vaultMasterKey: string;
   readonly dispatchDefaults: DispatchDefaults;
   readonly dispatchOverrides: DispatchOverrides;
+  readonly reconcile: ReconcileConfig;
 }
 
 export function loadWorkerConfig(): WorkerConfig {
@@ -155,5 +157,12 @@ export function loadWorkerConfig(): WorkerConfig {
       publishTimeoutMs,
     },
     dispatchOverrides: parseOverrides(optionalEnv('DISPATCH_OVERRIDES', '')),
+    reconcile: {
+      batchSize: intEnv('RECONCILE_BATCH_SIZE', 25),
+      // Bounded so "lease plus one reconciler tick" is a number an operator can
+      // reason about rather than an unbounded wait.
+      pollIntervalMs: intEnv('RECONCILE_POLL_INTERVAL_MS', 15_000),
+      lookupTimeoutMs: intEnv('LOOKUP_TIMEOUT_MS', 15_000),
+    },
   };
 }
