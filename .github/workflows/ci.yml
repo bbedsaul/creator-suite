@@ -144,12 +144,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       # Context is the repo root, not services/poster: a workspace service needs
       # the root manifests and its workspace dependencies.
       - name: Build image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: services/poster/Dockerfile
@@ -177,31 +177,52 @@ jobs:
           done
           echo "healthz never answered"; docker logs api; exit 1
 
-      # No database is reachable here, so the worker is expected to start its
-      # loops and then fail to poll. Starting is the thing under test: it proves
-      # the entrypoint exists, the vault key is validated, and the config loads.
-      - name: Worker entrypoint starts its loops
+      # No database is reachable here, so this asserts two things: the worker
+      # entrypoint exists and its config loads (it logs `poster-worker starting`
+      # with the vault key validated and the adapters registered), and it then
+      # **exits non-zero** rather than idling. That fail-fast is deliberate —
+      # `loadDispatchablePlatforms` runs once at startup — and it is why the host
+      # must restart the machine (see the runbook). Asserting the exit code is what
+      # makes a change to that behaviour visible instead of silent.
+      - name: Worker entrypoint loads its config, then fails fast with no database
         run: |
-          docker run -d --name worker \
+          docker run --name worker \
             -e DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:54322/postgres' \
             -e VAULT_MASTER_KEY="$(openssl rand -base64 32)" \
-            poster-service:ci node dist/worker/index.js
-          sleep 8
+            poster-service:ci node dist/worker/index.js || true
           docker logs worker
           docker logs worker 2>&1 | grep -q 'poster-worker starting' || {
-            echo "worker did not start"; exit 1; }
-          docker logs worker 2>&1 | grep -q 'webhook deliverer started' || {
-            echo "webhook deliverer did not start"; exit 1; }
+            echo "worker entrypoint never ran"; exit 1; }
+          docker logs worker 2>&1 | grep -q '"adapters":\["fake"\]' || {
+            echo "adapter registry did not load"; exit 1; }
+          code=$(docker inspect -f '{{.State.ExitCode}}' worker)
+          test "$code" != "0" || {
+            echo "expected a non-zero exit with no database, got $code"; exit 1; }
+          echo "worker exited $code with no database reachable, as designed"
+
+      # A worker that refuses to start on a bad VAULT_MASTER_KEY is the whole point
+      # of validating it at startup (D-071): a short key must not be discovered at
+      # the first decrypt, hours later.
+      - name: Worker refuses a malformed vault key
+        run: |
+          docker run --name badkey \
+            -e DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:54322/postgres' \
+            -e VAULT_MASTER_KEY='too-short' \
+            poster-service:ci node dist/worker/index.js || true
+          docker logs badkey 2>&1 | grep -q 'VAULT_MASTER_KEY must be 32 bytes' || {
+            echo "expected the key-length check to reject it"; docker logs badkey; exit 1; }
 
       # ffprobe comes from apk, not npm (D-062): /v1/media cannot read a video
       # without it, and it is easy to lose in a base-image change.
       - name: ffprobe is present
         run: docker run --rm poster-service:ci ffprobe -version
 
-      - name: SIGTERM shuts the worker down cleanly
+      # Tested on the API, because it is the process that stays up without a
+      # database. The worker's graceful shutdown — the one that matters, since it
+      # holds dispatch leases — is covered by test/shutdown.test.ts, which has a
+      # database and can assert that in-flight work finishes.
+      - name: SIGTERM shuts the API down cleanly inside the deploy budget
         run: |
-          docker stop -t 60 worker
-          test "$(docker inspect -f '{{.State.ExitCode}}' worker)" = "0" || {
-            echo "worker did not exit cleanly"; docker logs worker; exit 1; }
-          docker logs worker 2>&1 | grep -q 'shutdown complete' || {
-            echo "no clean shutdown in the log"; exit 1; }
+          docker stop -t 60 api
+          test "$(docker inspect -f '{{.State.ExitCode}}' api)" = "0" || {
+            echo "api did not exit cleanly"; docker logs api; exit 1; }

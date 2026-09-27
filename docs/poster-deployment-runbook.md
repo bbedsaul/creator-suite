@@ -282,6 +282,18 @@ A missing `dispatch loop started` for a platform means that platform is not
 enabled or has no constraint spec — `claim_due_targets` joins both and requires
 `platforms.enabled` (D-070), so the worker will never pick its targets up.
 
+**The worker exits if the database is unreachable at startup.** It logs
+`poster-worker starting` and then dies, because it reads the dispatchable platforms
+once before starting any loop. That is deliberate fail-fast, not a crash to
+diagnose — but it means **the host must restart it**. Fly restarts machines by
+default, so a database blip during a deploy shows as a short crash-loop that
+resolves itself. If you see repeated `poster-worker starting` with nothing after
+it, the worker is not broken: it cannot reach `DATABASE_URL`.
+
+The API behaves differently on purpose: `/healthz` does not touch the database, so
+the API stays up and serves health checks while the database is away. Requests that
+need data fail; the process does not.
+
 `adapters=["fake"]` is correct for M1 and **wrong for production**: the fake
 adapter posts nowhere. A real aggregator adapter is registered in S09's live half.
 
