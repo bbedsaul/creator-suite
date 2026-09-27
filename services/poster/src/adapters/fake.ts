@@ -45,6 +45,7 @@ export interface FakeAdapterOptions {
   /** Scenario per target id. Targets with no scenario succeed immediately. */
   readonly scenarios?: Map<string, FakeScenario>;
   readonly supportsIdempotencyKey?: boolean;
+  readonly supportsReferenceLookup?: boolean;
 }
 
 export interface FakeAdapter extends PlatformAdapter {
@@ -180,6 +181,9 @@ export function createFakeAdapter(options: FakeAdapterOptions = {}): FakeAdapter
       'facebook_pages',
     ],
     supportsIdempotencyKey: options.supportsIdempotencyKey ?? true,
+    // The fake models a provider that honours our attempt id both ways; the
+    // chaos harness depends on being able to look a publish up by it (D-076).
+    supportsReferenceLookup: options.supportsReferenceLookup ?? true,
 
     async publish(request) {
       attemptRefs.push(request.attemptRef);

@@ -1,0 +1,77 @@
+{
+  "single_match": {
+    "status": 200,
+    "body": {
+      "history": [
+        {
+          "id": "abc123POSTID",
+          "post": "Behind the scenes of episode 12",
+          "platforms": ["tiktok"],
+          "status": "success",
+          "created": "2026-09-26T12:00:05Z",
+          "type": "immediate",
+          "postIds": [
+            {
+              "status": "success",
+              "platform": "tiktok",
+              "id": "7300000000000000000",
+              "postUrl": "https://www.tiktok.com/@testcreator/video/7300000000000000000"
+            }
+          ]
+        }
+      ],
+      "count": 1,
+      "refId": "13a9da9e0df1183a7a6a1fc2c60b8023fa9a32a0"
+    }
+  },
+  "single_match_still_pending": {
+    "status": 200,
+    "body": {
+      "history": [
+        {
+          "id": "abc123POSTID",
+          "post": "Behind the scenes of episode 12",
+          "status": "pending",
+          "postIds": [{ "status": "pending", "platform": "tiktok" }]
+        }
+      ],
+      "count": 1
+    }
+  },
+  "two_identical_captions": {
+    "status": 200,
+    "body": {
+      "history": [
+        {
+          "id": "abc123POSTID",
+          "post": "Behind the scenes of episode 12",
+          "status": "success",
+          "postIds": [{ "status": "success", "platform": "tiktok", "id": "7300000000000000001" }]
+        },
+        {
+          "id": "xyz789POSTID",
+          "post": "Behind the scenes of episode 12",
+          "status": "success",
+          "postIds": [{ "status": "success", "platform": "tiktok", "id": "7300000000000000002" }]
+        }
+      ],
+      "count": 2
+    }
+  },
+  "no_match": {
+    "status": 200,
+    "body": {
+      "history": [
+        {
+          "id": "other1",
+          "post": "Something the user posted themselves",
+          "status": "success",
+          "postIds": [{ "status": "success", "platform": "tiktok", "id": "7300000000000000003" }]
+        }
+      ],
+      "count": 1
+    }
+  },
+  "empty": { "status": 200, "body": { "history": [], "count": 0 } },
+  "unauthorized": { "status": 401, "body": { "status": "error", "message": "Invalid API key" } }
+}

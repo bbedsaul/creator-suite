@@ -204,7 +204,7 @@ async function dispatchOne(
       ${deps.workerId},
       ${attemptNo},
       ${outcome.kind}::poster.attempt_outcome,
-      ${outcome.kind === 'success' ? outcome.platformPostId : null},
+      ${outcome.kind === 'success' ? (outcome.platformPostId ?? null) : null},
       ${outcome.kind === 'success' ? (outcome.permalink ?? null) : null},
       ${outcome.kind === 'success' ? null : outcome.message},
       ${deps.sql.json((outcome.raw ?? null) as never)},

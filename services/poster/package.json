@@ -12,6 +12,7 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:live": "node --env-file-if-exists=../../.env.local node_modules/vitest/vitest.mjs run --config vitest.live.config.ts",
     "gen:types": "node scripts/gen-types.mjs",
     "seed": "node --env-file-if-exists=../../.env.local dist/seed.js",
     "seed:constraints": "node dist/seed-constraints.js",

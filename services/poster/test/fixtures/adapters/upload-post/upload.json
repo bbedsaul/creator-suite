@@ -1,0 +1,109 @@
+{
+  "success_tiktok": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "results": {
+        "tiktok": {
+          "success": true,
+          "url": "https://www.tiktok.com/@testcreator/video/7300000000000000000",
+          "publish_id": "v2.7300000000000000000",
+          "video_was_transcoded": true,
+          "changes": {},
+          "prevalidation_metadata": {}
+        }
+      },
+      "usage": { "count": 12, "limit": 100, "last_reset": "2026-09-01T10:00:00.000Z" }
+    }
+  },
+  "success_youtube": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "results": {
+        "youtube": {
+          "success": true,
+          "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+          "video_id": "dQw4w9WgXcQ"
+        }
+      }
+    }
+  },
+  "success_without_identifiers": {
+    "status": 200,
+    "body": { "success": true, "results": { "tiktok": { "success": true } } }
+  },
+  "expired_token": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "results": { "youtube": { "success": false, "error": "Expired access token" } }
+    }
+  },
+  "skipped_not_configured": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "results": {
+        "tiktok": {
+          "success": false,
+          "skipped": true,
+          "skip_reason": "profile_platform_not_configured",
+          "error": "Profile creator has no Tiktok account configured"
+        }
+      }
+    }
+  },
+  "missing_platform_result": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "results": { "instagram": { "success": true, "url": "https://instagram.com/p/x" } }
+    }
+  },
+  "unexpectedly_scheduled": {
+    "status": 202,
+    "body": {
+      "success": true,
+      "job_id": "scheduler_job_123",
+      "scheduled_date": "2026-09-27T10:00:00Z"
+    }
+  },
+  "bad_request": {
+    "status": 400,
+    "body": { "success": false, "message": "Username required in form data" }
+  },
+  "unauthorized": {
+    "status": 401,
+    "body": { "success": false, "message": "Invalid or expired token" }
+  },
+  "plan_restricted": {
+    "status": 403,
+    "body": { "success": false, "message": "TikTok requires a paid plan" }
+  },
+  "quota_exceeded": {
+    "status": 429,
+    "headers": { "retry-after": "120" },
+    "body": {
+      "success": false,
+      "message": "This upload would exceed your monthly limit.",
+      "usage": { "count": 10, "limit": 10, "last_reset": "2026-09-01T10:00:00.000Z" }
+    }
+  },
+  "server_error": {
+    "status": 500,
+    "body": { "success": false, "message": "Internal Server Error" }
+  },
+  "platform_unavailable": {
+    "status": 503,
+    "body": { "success": false, "message": "Platform unavailable" }
+  },
+  "echoes_credential": {
+    "status": 400,
+    "body": {
+      "success": false,
+      "message": "Rejected request authorized with Apikey up_live_SECRETVALUE",
+      "api_key": "up_live_SECRETVALUE"
+    }
+  }
+}

@@ -55,7 +55,14 @@ export interface PublishRequest {
 export type PublishOutcome =
   | {
       readonly kind: 'success';
-      readonly platformPostId: string;
+      /**
+       * Optional because `post_targets.platform_post_id` is nullable and the
+       * contract sends `platform_post_id` as nullable too: some providers confirm
+       * a publish without naming the post. Omitting it is honest; inventing one
+       * would put a value that is not the platform's id in a column that means
+       * exactly that.
+       */
+      readonly platformPostId?: string;
       readonly permalink?: string;
       readonly raw: unknown;
     }
@@ -76,13 +83,22 @@ export interface LookupRequest {
 }
 
 export type LookupOutcome =
-  | { readonly kind: 'found'; readonly platformPostId: string; readonly permalink?: string }
+  | { readonly kind: 'found'; readonly platformPostId?: string; readonly permalink?: string }
   /** Provably not posted. Only this makes a retry safe. */
   | { readonly kind: 'absent' }
   | { readonly kind: 'unknown' };
 
 export interface ConnectionCheckRequest {
   readonly credential: AdapterCredential;
+  /**
+   * Which platform's account to check (D-085).
+   *
+   * An aggregator profile holds one linked account per platform and reports their
+   * health separately, so "is this connection alive" has no answer without the
+   * platform. A connection row always knows its own `platform_id`, so this costs
+   * the caller nothing.
+   */
+  readonly platformId: string;
   readonly externalAccountId: string;
   readonly timeoutMs: number;
 }
@@ -100,6 +116,16 @@ export interface PlatformAdapter {
   readonly platforms: readonly string[];
   /** Whether the provider accepts `attemptRef` as an idempotency key (D-012). */
   readonly supportsIdempotencyKey: boolean;
+  /**
+   * Whether the provider can be **queried** by `attemptRef` afterwards (D-084).
+   *
+   * Separate from `supportsIdempotencyKey` because the two come apart in
+   * practice: a provider can accept our reference to reject duplicates and still
+   * offer no way to read it back. Only this flag predicts whether `lookup` can
+   * ever answer `absent`, and therefore whether an ambiguous dispatch is
+   * recoverable automatically or needs a human.
+   */
+  readonly supportsReferenceLookup: boolean;
 
   publish(request: PublishRequest): Promise<PublishOutcome>;
   lookup(request: LookupRequest): Promise<LookupOutcome>;

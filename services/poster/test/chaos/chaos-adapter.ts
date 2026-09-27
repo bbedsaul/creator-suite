@@ -86,6 +86,7 @@ export function createChaosAdapter(options: ChaosAdapterOptions): PlatformAdapte
     id: 'chaos',
     platforms: ['tiktok', 'youtube'],
     supportsIdempotencyKey: true,
+    supportsReferenceLookup: true,
 
     publish(request: PublishRequest): Promise<PublishOutcome> {
       if (crashAt === 'before_send') die();

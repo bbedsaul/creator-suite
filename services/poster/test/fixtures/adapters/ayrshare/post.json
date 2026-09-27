@@ -1,0 +1,119 @@
+{
+  "success_youtube": {
+    "status": 200,
+    "body": {
+      "status": "success",
+      "id": "abc123POSTID",
+      "refId": "13a9da9e0df1183a7a6a1fc2c60b8023fa9a32a0",
+      "postIds": [
+        {
+          "status": "success",
+          "platform": "youtube",
+          "id": "dQw4w9WgXcQ",
+          "postUrl": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        }
+      ]
+    }
+  },
+  "success_tiktok": {
+    "status": 200,
+    "body": {
+      "status": "success",
+      "id": "def456POSTID",
+      "postIds": [
+        {
+          "status": "success",
+          "platform": "tiktok",
+          "id": "7300000000000000000",
+          "postUrl": "https://www.tiktok.com/@testcreator/video/7300000000000000000"
+        }
+      ]
+    }
+  },
+  "success_without_id": {
+    "status": 200,
+    "body": {
+      "status": "success",
+      "id": "ghi789POSTID",
+      "postIds": [{ "status": "success", "platform": "tiktok", "postUrl": "https://tiktok.com/x" }]
+    }
+  },
+  "pending_tiktok": {
+    "status": 200,
+    "body": {
+      "status": "pending",
+      "id": "jkl012POSTID",
+      "refId": "13a9da9e0df1183a7a6a1fc2c60b8023fa9a32a0",
+      "postIds": [{ "status": "pending", "platform": "tiktok" }]
+    }
+  },
+  "duplicate_content": {
+    "status": 200,
+    "body": {
+      "status": "error",
+      "errors": [
+        {
+          "code": 137,
+          "message": "Duplicate or similar content posted within the same two day period. The social networks prohibit duplicate content.",
+          "platform": "tiktok",
+          "post": "mno345POSTID",
+          "refId": "13a9da9e0df1183a7a6a1fc2c60b8023fa9a32a0"
+        }
+      ]
+    }
+  },
+  "platform_rejection": {
+    "status": 200,
+    "body": {
+      "status": "error",
+      "id": "pqr678POSTID",
+      "postIds": [
+        {
+          "status": "error",
+          "platform": "youtube",
+          "message": "The video title exceeds the maximum allowed length."
+        }
+      ],
+      "errors": [
+        {
+          "code": 210,
+          "message": "The video title exceeds the maximum allowed length.",
+          "platform": "youtube"
+        }
+      ]
+    }
+  },
+  "no_postids": {
+    "status": 200,
+    "body": { "status": "scheduled", "id": "stu901POSTID", "scheduleDate": "2026-09-27T10:00:00Z" }
+  },
+  "unauthorized": {
+    "status": 401,
+    "body": { "status": "error", "message": "Invalid API key" }
+  },
+  "payment_required": {
+    "status": 402,
+    "body": { "status": "error", "message": "TikTok requires the Premium plan or higher" }
+  },
+  "rate_limited": {
+    "status": 429,
+    "headers": { "retry-after": "30" },
+    "body": { "status": "error", "message": "Rate limit exceeded" }
+  },
+  "rate_limited_without_header": {
+    "status": 429,
+    "body": { "status": "error", "message": "Rate limit exceeded" }
+  },
+  "server_error": {
+    "status": 502,
+    "body": { "status": "error", "message": "Bad Gateway" }
+  },
+  "echoes_credential": {
+    "status": 401,
+    "body": {
+      "status": "error",
+      "message": "Invalid API key: AYR_SECRETVALUE",
+      "apiKey": "AYR_SECRETVALUE"
+    }
+  }
+}

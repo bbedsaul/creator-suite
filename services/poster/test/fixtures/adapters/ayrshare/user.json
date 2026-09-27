@@ -1,0 +1,59 @@
+{
+  "active": {
+    "status": 200,
+    "body": {
+      "activeSocialAccounts": ["tiktok", "youtube"],
+      "displayNames": [
+        {
+          "created": "2026-09-01T02:11:53.452Z",
+          "displayName": "Test Creator",
+          "id": "5ebc6f39-7900-421e-bf9",
+          "platform": "tiktok",
+          "profileUrl": "https://www.tiktok.com/@testcreator",
+          "refreshDaysRemaining": 234,
+          "refreshRequired": "2027-05-18T15:25:32.344Z",
+          "username": "@testcreator"
+        },
+        {
+          "created": "2026-09-01T01:38:42.326Z",
+          "displayName": "Test Channel",
+          "id": "106891058521430758565",
+          "platform": "youtube",
+          "profileUrl": "https://www.youtube.com/@testchannel",
+          "username": "@testchannel"
+        }
+      ],
+      "monthlyPostCount": 49,
+      "monthlyPostQuota": 500,
+      "refId": "13a9da9e0df1183a7a6a1fc2c60b8023fa9a32a0",
+      "title": "Primary Profile"
+    }
+  },
+  "expiring_soon": {
+    "status": 200,
+    "body": {
+      "activeSocialAccounts": ["tiktok"],
+      "displayNames": [
+        {
+          "displayName": "Test Creator",
+          "platform": "tiktok",
+          "refreshDaysRemaining": 3,
+          "refreshRequired": "2026-09-29T15:25:32.344Z",
+          "username": "@testcreator"
+        }
+      ]
+    }
+  },
+  "platform_unlinked": {
+    "status": 200,
+    "body": {
+      "activeSocialAccounts": ["youtube"],
+      "displayNames": [{ "displayName": "Test Channel", "platform": "youtube" }]
+    }
+  },
+  "nothing_linked": {
+    "status": 200,
+    "body": { "refId": "13a9da9e0df1183a7a6a1fc2c60b8023fa9a32a0", "title": "Primary Profile" }
+  },
+  "unauthorized": { "status": 401, "body": { "status": "error", "message": "Invalid API key" } }
+}

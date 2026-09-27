@@ -92,6 +92,8 @@ pnpm exec supabase start && pnpm exec supabase db reset   # applies all migratio
 pnpm exec supabase test db                 # pgTAP
 pnpm -F @suite/poster-service test
 pnpm -F @suite/poster-service test:integration   # needs a running local stack (D-040)
+LIVE_ADAPTER_TESTS=1 pnpm -F @suite/poster-service test:live   # real aggregator accounts (D-091)
+                                                 #   + LIVE_ADAPTER_PUBLISH=1 to actually post
 pnpm -F @suite/poster-service gen:types          # regenerate DB types after a migration
 pnpm -F @suite/poster-service seed               # register dev client apps -> .env.local (D-049)
 pnpm -F @suite/poster-service seed -- --rotate   # issue new secrets (default preserves, D-051)

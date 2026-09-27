@@ -154,7 +154,7 @@ async function reconcileOne(
       ${worker},
       ${attemptNo},
       ${outcome.kind === 'found' ? 'success' : outcome.kind === 'absent' ? 'transient' : 'unknown'}::poster.attempt_outcome,
-      ${outcome.kind === 'found' ? outcome.platformPostId : null},
+      ${outcome.kind === 'found' ? (outcome.platformPostId ?? null) : null},
       ${outcome.kind === 'found' ? (outcome.permalink ?? null) : null},
       ${outcome.kind === 'unknown' ? 'reconciliation could not determine the outcome' : null},
       ${deps.sql.json({ reconciled: true, lookup: outcome.kind } as never)},

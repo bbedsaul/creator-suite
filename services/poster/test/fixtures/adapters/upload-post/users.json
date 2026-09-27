@@ -1,0 +1,61 @@
+{
+  "active": {
+    "status": 200,
+    "body": {
+      "limit": 10,
+      "plan": "basic",
+      "success": true,
+      "profiles": [
+        {
+          "created_at": "2026-09-01T17:44:33.229755",
+          "username": "test-creator",
+          "social_accounts": {
+            "tiktok": {
+              "display_name": "Test Creator",
+              "social_images": "https://img.test/tt.png"
+            },
+            "youtube": {
+              "display_name": "Test Channel",
+              "social_images": "https://img.test/yt.png"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "reauth_required": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "profiles": [
+        {
+          "username": "test-creator",
+          "social_accounts": {
+            "tiktok": { "display_name": "Test Creator", "reauth_required": true }
+          }
+        }
+      ]
+    }
+  },
+  "platform_unlinked": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "profiles": [
+        {
+          "username": "test-creator",
+          "social_accounts": { "tiktok": "", "youtube": { "display_name": "Test Channel" } }
+        }
+      ]
+    }
+  },
+  "no_such_profile": {
+    "status": 200,
+    "body": { "success": true, "profiles": [{ "username": "someone-else", "social_accounts": {} }] }
+  },
+  "unauthorized": {
+    "status": 401,
+    "body": { "success": false, "message": "Invalid or expired token" }
+  },
+  "unreadable": { "status": 200, "body": { "success": true } }
+}
