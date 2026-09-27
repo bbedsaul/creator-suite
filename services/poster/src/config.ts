@@ -1,4 +1,9 @@
 import { intEnv, optionalEnv, requireEnv } from '@suite/server-core';
+import {
+  parseOverrides,
+  type DispatchDefaults,
+  type DispatchOverrides,
+} from './worker/platforms.js';
 
 export type LogLevel = 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
 
@@ -104,5 +109,51 @@ export function loadApiConfig(): ApiConfig {
       .split(',')
       .map((origin) => origin.trim())
       .filter((origin) => origin !== ''),
+  };
+}
+
+/**
+ * Config the worker needs. Separate from ApiConfig because the two processes have
+ * genuinely different requirements: the worker needs the vault key and dispatch
+ * budgets and no CORS or Supabase storage; the API needs the reverse.
+ */
+export interface WorkerConfig {
+  readonly databaseUrl: string;
+  readonly poolSize: number;
+  /** 32 bytes base64. Wraps per-credential data keys (D-020). */
+  readonly vaultMasterKey: string;
+  readonly dispatchDefaults: DispatchDefaults;
+  readonly dispatchOverrides: DispatchOverrides;
+}
+
+export function loadWorkerConfig(): WorkerConfig {
+  const masterKey = requireEnv('VAULT_MASTER_KEY');
+  if (Buffer.from(masterKey, 'base64').length !== 32) {
+    throw new Error('VAULT_MASTER_KEY must be 32 bytes, base64-encoded (openssl rand -base64 32)');
+  }
+
+  const concurrency = intEnv('DISPATCH_CONCURRENCY', 8);
+  const leaseMs = intEnv('DISPATCH_LEASE_MS', 300_000);
+  const publishTimeoutMs = intEnv('PUBLISH_TIMEOUT_MS', 30_000);
+
+  // A lease shorter than the publish deadline would let a target be reconciled
+  // while its adapter call is still running, which is how double-posts happen.
+  if (leaseMs <= publishTimeoutMs) {
+    throw new Error(
+      `DISPATCH_LEASE_MS (${String(leaseMs)}) must exceed PUBLISH_TIMEOUT_MS (${String(publishTimeoutMs)})`,
+    );
+  }
+
+  return {
+    databaseUrl: requireEnv('DATABASE_URL'),
+    poolSize: intEnv('WORKER_POOL_SIZE', Math.max(4, concurrency + 2)),
+    vaultMasterKey: masterKey,
+    dispatchDefaults: {
+      concurrency,
+      pollIntervalMs: intEnv('DISPATCH_POLL_INTERVAL_MS', 1_000),
+      leaseMs,
+      publishTimeoutMs,
+    },
+    dispatchOverrides: parseOverrides(optionalEnv('DISPATCH_OVERRIDES', '')),
   };
 }

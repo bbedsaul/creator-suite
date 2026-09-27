@@ -29,6 +29,17 @@ export {
 } from './jwt.js';
 
 export {
+  SecretDecryptError,
+  createLocalKeyManager,
+  sealSecret,
+  openSecret,
+  secretsEqual,
+  type KeyManager,
+  type SealedSecret,
+  type LocalKeyManagerOptions,
+} from './envelope.js';
+
+export {
   InMemoryRateLimiter,
   type RateLimiter,
   type RateLimitVerdict,

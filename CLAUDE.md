@@ -102,7 +102,8 @@ pnpm -F @suite/poster-service seed:grants -- --user <uuid> [--app trainer-dev]  
 pnpm lint:limits                                 # no platform limit hard-coded in TS (rule 9)
 pnpm lint:limits:verify                          # proves lint:limits rejects real violations
 pnpm -F @suite/poster-service dev:api      # backend alone — no frontend needed
-pnpm -F @suite/poster-service dev:worker
+pnpm -F @suite/poster-service dev:worker    # needs VAULT_MASTER_KEY (D-071):
+                                           #   openssl rand -base64 32
 pnpm -F @suite/poster-contract gen         # regenerate OpenAPI spec + client
 pnpm lint:deps                             # boundary check (D-022)
 pnpm lint:deps:verify                      # proves lint:deps rejects real violations

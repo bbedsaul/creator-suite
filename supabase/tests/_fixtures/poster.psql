@@ -44,5 +44,28 @@ insert into poster.posts (id, user_id, app_id, external_ref, content) values
   ('55555555-5555-5555-5555-555555555555','11111111-1111-1111-1111-111111111111','22222222-2222-2222-2222-222222222222','ext-a','{"text":"user A post"}'),
   ('55555555-5555-5555-5555-55555555555b','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','22222222-2222-2222-2222-222222222222','ext-b','{"text":"user B post"}');
 
+-- Dispatch requires an enabled platform with a published constraint spec
+-- (D-058, D-070). Platforms ship disabled, so the fixture switches on the ones
+-- these suites dispatch to and gives them a minimal spec. These specs are
+-- deliberately not the real ones: the committed specs are covered by
+-- packages/poster-contract's own tests.
+update poster.platforms set enabled = true where id in ('tiktok', 'youtube', 'x');
+
+insert into poster.platform_constraints (platform_id, spec, spec_version)
+select id,
+       jsonb_build_object(
+         'provisional', true,
+         'text',    jsonb_build_object('max_length', 2200, 'unit', 'utf16_code_units'),
+         'media',   jsonb_build_object('kinds', jsonb_build_array('video'),
+                                       'mime_types', jsonb_build_array('video/mp4'),
+                                       'min_count', 0, 'max_count', 1),
+         'threads', jsonb_build_object('supported', false),
+         'sources', jsonb_build_array(
+                      jsonb_build_object('url', 'https://example.test/pgtap',
+                                         'retrieved', '2026-09-26'))),
+       1
+  from poster.platforms where id in ('tiktok', 'youtube', 'x')
+on conflict (platform_id) do nothing;
+
 -- Events emitted while building the fixture are noise for the assertions.
 delete from poster.webhook_events;
