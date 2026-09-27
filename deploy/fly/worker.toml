@@ -1,0 +1,43 @@
+# Poster worker — Fly.io (D-098, D-102).
+#
+# Same image as the API, different entrypoint (D-034). Deploy the image the API
+# deploy produced, so both processes are provably the same build:
+#
+#   fly deploy --config deploy/fly/worker.toml --image <image ref from the api deploy>
+#
+# `fly status --app poster-api-staging` prints the ref.
+
+app            = "poster-worker-staging"
+primary_region = "iad"   # must match the API and the Supabase project
+
+# The one that matters. On a deploy or a host event Fly sends SIGTERM; the worker
+# stops claiming and finishes what it holds. Cutting it short is *safe* — stale
+# dispatches are reconciled, proven across 100 SIGKILLs (D-076) — but recovery
+# costs a full lease, so a routine deploy should never rely on it.
+# SHUTDOWN_TIMEOUT_MS (10 s) + PUBLISH_TIMEOUT_MS (30 s) fits inside 60 s.
+kill_signal  = "SIGTERM"
+kill_timeout = "60s"
+
+[build]
+  dockerfile = "services/poster/Dockerfile"
+
+[env]
+  NODE_ENV  = "production"
+  LOG_LEVEL = "info"
+
+[processes]
+  worker = "node dist/worker/index.js"
+
+# Deliberately no [http_service] and no [[services]]: the worker serves nothing
+# and must not be reachable from the internet. With no service defined there is
+# also no autostop to disable — the machine simply keeps running, which is what a
+# process holding dispatch leases needs.
+#
+# The consequence to know about: Fly cannot health-check a process with no port,
+# so liveness comes from the startup lines and the queries in
+# supabase/observability/poster-m1-metrics.sql, not from the platform. A wedged
+# worker shows up as a rising reconciliation backlog (query 5), not as a red dot.
+
+[[vm]]
+  size   = "shared-cpu-1x"
+  memory = "512mb"

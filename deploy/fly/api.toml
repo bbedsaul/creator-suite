@@ -1,0 +1,57 @@
+# Poster API — Fly.io (D-098, D-102).
+#
+# Deploy from the REPO ROOT: the Dockerfile needs the root manifests and the
+# workspace packages, so the build context is `.`, not this directory.
+#
+#   fly deploy --config deploy/fly/api.toml --dockerfile services/poster/Dockerfile .
+#
+# Secrets are never in this file. See §2 of docs/poster-deployment-runbook.md.
+
+app            = "poster-api-staging"
+# Put this in the same region as the Supabase project: every dispatch decision is
+# a database round trip, so cross-region latency lands directly on the p95 lag
+# budget in NFR-01.
+primary_region = "iad"
+
+# 60 s, because a rolling deploy must not cut a publish in half. The worker is the
+# process that really needs this (SHUTDOWN_TIMEOUT_MS plus PUBLISH_TIMEOUT_MS), but
+# the API is given the same budget so an in-flight upload finishes.
+kill_signal  = "SIGTERM"
+kill_timeout = "60s"
+
+[build]
+  dockerfile = "services/poster/Dockerfile"
+
+[env]
+  NODE_ENV     = "production"
+  PORT         = "8080"
+  HOST         = "0.0.0.0"
+  LOG_LEVEL    = "info"
+  MEDIA_BUCKET = "poster-media"
+  # No browser client in M1 (D-024), so no origins are allowed. M3 sets this.
+  CORS_ALLOWED_ORIGINS = ""
+
+[processes]
+  app = "node dist/api/index.js"
+
+[http_service]
+  internal_port = 8080
+  force_https   = true
+  processes     = ["app"]
+  # Never suspend or stop: a stopped API is a failed webhook delivery for every
+  # consumer and a 502 for every client. Cold starts are not worth the pennies.
+  auto_stop_machines   = "off"
+  auto_start_machines  = true
+  # 1 for staging; 2+ in production so a deploy is not an outage.
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval     = "30s"
+    timeout      = "3s"
+    grace_period = "10s"
+    method       = "GET"
+    path         = "/healthz"
+
+[[vm]]
+  size   = "shared-cpu-1x"
+  memory = "512mb"

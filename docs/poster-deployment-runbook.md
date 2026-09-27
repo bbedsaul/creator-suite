@@ -32,20 +32,30 @@ fenced on `claimed_by` — so two workers cannot take the same target and a revi
 zombie cannot finish one that has been reassigned (D-012). There is no leader
 election to configure.
 
-### Host
+### Host: Fly.io
 
-D-018 left the container host open, to be decided by S10. **Recommendation:
-Fly.io**, not settled until you say so (D-098):
+**Decided** (D-098, confirmed 2026-09-27), superseding D-018's "TBD by S10". Why:
 
 - Long-running processes are the default rather than a workaround; the worker is
   not a request handler and must not be scaled to zero or cycled mid-dispatch.
-- Two process groups from one image is its native model (`[processes]` in
-  `fly.toml`), which matches D-034 exactly.
 - Private networking to Supabase without exposing the worker publicly.
+- Deploying the same image twice with different commands is a first-class flow,
+  which is exactly D-034.
 
-Railway works the same way if you prefer it. What the host must provide: run a
-container indefinitely, never scale the worker to zero, allow ~60 s for graceful
-shutdown on SIGTERM, and inject secrets as environment variables.
+Config lives in `deploy/fly/api.toml` and `deploy/fly/worker.toml`. See §3 for the
+deploy commands.
+
+**Two Fly apps, not one app with two process groups** (D-102). Process groups
+would be neater, but Fly secrets are per **app**, and these two processes have
+disjoint secret needs — `VAULT_MASTER_KEY` belongs only to the worker, and
+`APP_TOKEN_SECRET` and `SUPABASE_SERVICE_ROLE_KEY` only to the API. The config
+module already enforces that split; collapsing it to save one file would hand the
+API the key that wraps every stored credential, for nothing.
+
+Nothing in the application depends on the host, so this stays cheap to reverse.
+What *any* host must provide: run a container indefinitely, never scale the worker
+to zero, allow ~60 s for graceful shutdown on SIGTERM, and inject secrets as
+environment variables.
 
 ---
 
@@ -156,6 +166,90 @@ rotating it needs a re-wrap pass that does not exist yet (M2, D-020).
 Steps 1, 3 and 4 run from a checkout today, which is a known gap — the loaders
 should eventually run as a job in the image so a deploy does not depend on
 somebody's laptop.
+
+---
+
+## 3a. Fly.io, concretely
+
+One-time setup, per environment (`-staging`, then `-prod`):
+
+```bash
+fly apps create poster-api-staging
+fly apps create poster-worker-staging
+```
+
+Edit `primary_region` in both configs to match the Supabase project's region.
+Every dispatch decision is a database round trip, so cross-region latency lands
+straight on the NFR-01 lag budget.
+
+### Secrets
+
+Set them per app, and only where they are needed (D-102):
+
+```bash
+# API
+fly secrets set --app poster-api-staging \
+  DATABASE_URL='postgresql://…' \
+  APP_TOKEN_SECRET='…' \
+  SUPABASE_URL='https://<ref>.supabase.co' \
+  SUPABASE_SERVICE_ROLE_KEY='…' \
+  SUPABASE_JWKS_URL='https://<ref>.supabase.co/auth/v1/.well-known/jwks.json' \
+  SUPABASE_JWT_ISSUER='https://<ref>.supabase.co/auth/v1'
+
+# Worker
+fly secrets set --app poster-worker-staging \
+  DATABASE_URL='postgresql://…' \
+  VAULT_MASTER_KEY="$(openssl rand -base64 32)"
+
+# Plus one per app webhook secret, on the worker only — it is the process that
+# resolves `env:NAME` references (D-080).
+fly secrets set --app poster-worker-staging ACME_WEBHOOK_SECRET='…'
+```
+
+`VAULT_MASTER_KEY` must be generated **once** and kept. Every stored credential is
+encrypted under a data key wrapped by it; generating a fresh one on a later deploy
+silently breaks every existing connection. There is no re-wrap path yet (M2).
+
+### Deploying
+
+Build once, deploy that image twice, so both processes are provably the same bits:
+
+```bash
+# From the REPO ROOT — the Dockerfile needs the root manifests and workspace packages.
+fly deploy --config deploy/fly/api.toml --dockerfile services/poster/Dockerfile .
+
+# Take the image reference the API deploy produced…
+fly status --app poster-api-staging          # prints the image ref
+fly deploy --config deploy/fly/worker.toml --image <that ref>
+```
+
+Building the worker separately would also work and is what most examples show, but
+it makes "one image, two entrypoints" (D-034) a claim rather than a fact — two
+builds of the same commit are not guaranteed identical.
+
+**Order:** worker first, then API, when a change touches dispatch. See §5.
+
+### Scaling
+
+```bash
+fly scale count 2 --app poster-api-staging            # availability
+fly scale count 3 --app poster-worker-staging         # throughput
+```
+
+Multiple workers need no coordination: claiming is `for update skip locked` and
+completion is fenced on `claimed_by` (D-012). Scale the worker on *targets due per
+minute*, not CPU — it is almost always waiting on the database or a platform.
+
+### What Fly will not tell you
+
+The worker declares no service, so **Fly cannot health-check it**. A wedged worker
+stays "healthy" in `fly status`. Liveness comes from two places instead:
+
+- the five startup lines in §4, on `fly logs --app poster-worker-staging`;
+- query 5 in `supabase/observability/poster-m1-metrics.sql` — a growing
+  reconciliation backlog means dispatch is not progressing.
+
+Alert on the metrics, not on the platform's dot.
 
 ---
 
@@ -289,5 +383,7 @@ Stated plainly, because a runbook that implies more than exists is worse than no
 - **`VAULT_MASTER_KEY` rotation** has no re-wrap path yet (M2).
 - **Migrations and seeds run from a checkout**, not from the image.
 - **No staging environment exists yet**, which is why S10's acceptance criterion
-  is unmet. Everything above is verified locally and is untested against a real
-  host.
+  is unmet. The host is decided and the configs are written (D-098, D-102), but
+  nothing has been deployed: everything here is verified locally and **untested
+  against Fly.io**. Expect the first deploy to find something — most likely the
+  build context, the Supabase region, or a webhook URL the worker cannot reach.

@@ -49,6 +49,7 @@ packages/media-pipeline/   backend-only (built with the Clipper; extended by the
 supabase/migrations/    all schemas; Poster lives in the `poster` schema
 supabase/tests/         pgTAP tests
 supabase/observability/ §11 operational queries, plain SQL (D-097)
+deploy/fly/             Fly.io configs: two apps, one image (D-098, D-102)
 tools/webhook-sink/     reference webhook consumer (D-079)
 tools/m1-demo/          M1 exit demo: HTTP-only, generated client (D-093)
 docs/                   PRDs, API contract, session plan

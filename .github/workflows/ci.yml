@@ -128,3 +128,80 @@ jobs:
       - name: Supabase logs on failure
         if: failure()
         run: pnpm exec supabase status || true
+
+  # Builds the deployment artifact and runs both entrypoints out of it.
+  #
+  # Added because it was not here: the Dockerfile silently stopped building when
+  # the service gained `@suite/poster-contract` as a dependency and
+  # `@suite/poster-client` / `@suite/webhook-sink` as devDependencies. Every other
+  # gate stayed green for five sessions while the thing we would actually deploy
+  # could not be built (D-103). A deployable artifact that nothing builds is not a
+  # deployable artifact.
+  image:
+    name: Image builds and both entrypoints start
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Context is the repo root, not services/poster: a workspace service needs
+      # the root manifests and its workspace dependencies.
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/poster/Dockerfile
+          tags: poster-service:ci
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Both processes are checked, because they are the same image and different
+      # commands (D-034): a build that only ever runs the default CMD would not
+      # notice the worker entrypoint disappearing.
+      - name: API entrypoint serves /healthz
+        run: |
+          docker run -d --name api -p 8080:8080 \
+            -e DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:54322/postgres' \
+            -e APP_TOKEN_SECRET='ci-signing-secret-at-least-32-chars!!' \
+            -e SUPABASE_URL='http://127.0.0.1:54321' \
+            -e SUPABASE_SERVICE_ROLE_KEY='ci-service-role-key' \
+            -e SUPABASE_JWKS_URL='http://127.0.0.1:54321/auth/v1/.well-known/jwks.json' \
+            -e SUPABASE_JWT_ISSUER='http://127.0.0.1:54321/auth/v1' \
+            poster-service:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8080/healthz; then echo; exit 0; fi
+            sleep 1
+          done
+          echo "healthz never answered"; docker logs api; exit 1
+
+      # No database is reachable here, so the worker is expected to start its
+      # loops and then fail to poll. Starting is the thing under test: it proves
+      # the entrypoint exists, the vault key is validated, and the config loads.
+      - name: Worker entrypoint starts its loops
+        run: |
+          docker run -d --name worker \
+            -e DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:54322/postgres' \
+            -e VAULT_MASTER_KEY="$(openssl rand -base64 32)" \
+            poster-service:ci node dist/worker/index.js
+          sleep 8
+          docker logs worker
+          docker logs worker 2>&1 | grep -q 'poster-worker starting' || {
+            echo "worker did not start"; exit 1; }
+          docker logs worker 2>&1 | grep -q 'webhook deliverer started' || {
+            echo "webhook deliverer did not start"; exit 1; }
+
+      # ffprobe comes from apk, not npm (D-062): /v1/media cannot read a video
+      # without it, and it is easy to lose in a base-image change.
+      - name: ffprobe is present
+        run: docker run --rm poster-service:ci ffprobe -version
+
+      - name: SIGTERM shuts the worker down cleanly
+        run: |
+          docker stop -t 60 worker
+          test "$(docker inspect -f '{{.State.ExitCode}}' worker)" = "0" || {
+            echo "worker did not exit cleanly"; docker logs worker; exit 1; }
+          docker logs worker 2>&1 | grep -q 'shutdown complete' || {
+            echo "no clean shutdown in the log"; exit 1; }
